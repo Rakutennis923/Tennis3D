@@ -22,13 +22,17 @@
       overflow: hidden;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: #0f172a;
-      touch-action: none;
+      touch-action: manipulation;
+      -webkit-text-size-adjust: 100%;
+      overscroll-behavior: none;
     }
     #game-container {
-      position: relative;
+      position: fixed;
+      inset: 0;
       width: 100vw;
       height: 100dvh;
       overflow: hidden;
+      touch-action: none;
     }
     #three-canvas {
       display: block;
@@ -100,6 +104,38 @@
       transform: scale(0.91);
       filter: brightness(1.15);
     }
+    /* Mobile Landscape compact HUD so center court stays completely clear */
+    @media (orientation: landscape) and (max-height: 520px) {
+      #callout-banner {
+        top: 8px !important;
+        max-width: 44vw !important;
+      }
+      #callout-box {
+        padding: 2px 10px !important;
+        border-radius: 9999px !important;
+      }
+      #callout-title {
+        font-size: 12px !important;
+      }
+      #callout-sub {
+        font-size: 10px !important;
+      }
+      #serve-hint {
+        bottom: 6px !important;
+      }
+      #serve-hint > div {
+        padding: 2px 10px !important;
+        font-size: 10px !important;
+      }
+      #joystick-zone {
+        width: 96px !important;
+        height: 96px !important;
+      }
+      #joystick-knob {
+        width: 40px !important;
+        height: 40px !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -151,11 +187,11 @@
       </div>
     </div>
 
-    <!-- Top-Edge Compact Callout Banner (non-blocking on mobile) -->
-    <div id="callout-banner" class="hidden absolute top-[76px] sm:top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center max-w-[88vw]">
-      <div id="callout-box" class="callout-anim px-3.5 py-1 sm:px-5 sm:py-2 rounded-full sm:rounded-2xl bg-slate-900/55 border border-amber-400/50 shadow-lg backdrop-blur-sm">
-        <div id="callout-title" class="text-sm sm:text-2xl font-black tracking-wide text-amber-300 drop-shadow whitespace-nowrap">ACE!</div>
-        <div id="callout-sub" class="text-[11px] sm:text-sm font-semibold text-white/90 leading-tight"></div>
+    <!-- Top-Edge Compact Callout Banner (non-blocking on mobile portrait & landscape) -->
+    <div id="callout-banner" class="hidden absolute top-[72px] sm:top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center max-w-[86vw]">
+      <div id="callout-box" class="callout-anim px-3 py-1 sm:px-4 sm:py-1.5 rounded-full bg-slate-900/55 border border-amber-400/50 shadow-lg backdrop-blur-sm">
+        <div id="callout-title" class="text-xs sm:text-xl font-black tracking-wide text-amber-300 drop-shadow whitespace-nowrap">ACE!</div>
+        <div id="callout-sub" class="text-[10px] sm:text-xs font-semibold text-white/90 leading-tight"></div>
       </div>
     </div>
 
@@ -394,9 +430,9 @@
     const GRAVITY = -19.5;
 
     const DIFFICULTY = {
-      easy:   { aiSpeed: 5.8,  aiReact: 0.72, aiError: 1.5, aiPower: 0.82 },
-      normal: { aiSpeed: 7.8,  aiReact: 0.88, aiError: 0.75, aiPower: 0.96 },
-      hard:   { aiSpeed: 9.8,  aiReact: 0.97, aiError: 0.25, aiPower: 1.08 }
+      easy:   { aiSpeed: 3.4,  aiReact: 0.42, aiError: 2.2,  aiPower: 0.64, aiMissRate: 0.16 },
+      normal: { aiSpeed: 7.6,  aiReact: 0.86, aiError: 0.75, aiPower: 0.95, aiMissRate: 0.03 },
+      hard:   { aiSpeed: 10.0, aiReact: 0.98, aiError: 0.2,  aiPower: 1.10, aiMissRate: 0.0 }
     };
 
     const state = {
@@ -504,6 +540,46 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
         osc.start(now);
         osc.stop(now + 0.14);
+      } else if (type === 'game_win') {
+        // Uplifting game-win fanfare arpeggio
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((freq, idx) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = 'triangle';
+          o.connect(g);
+          g.connect(audioCtx.destination);
+          const t0 = now + idx * 0.09;
+          o.frequency.setValueAtTime(freq, t0);
+          g.gain.setValueAtTime(0.22, t0);
+          g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.34);
+          o.start(t0);
+          o.stop(t0 + 0.35);
+        });
+      } else if (type === 'match_win') {
+        // Grand Slam championship celebratory fanfare + chord
+        const melody = [
+          { f: 523.25, t: 0.00, d: 0.14 },
+          { f: 659.25, t: 0.13, d: 0.14 },
+          { f: 783.99, t: 0.26, d: 0.14 },
+          { f: 1046.5, t: 0.40, d: 0.32 },
+          { f: 783.99, t: 0.72, d: 0.16 },
+          { f: 1046.5, t: 0.90, d: 0.65 },
+          { f: 659.25, t: 0.90, d: 0.65 },
+          { f: 523.25, t: 0.90, d: 0.65 }
+        ];
+        melody.forEach(n => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = 'triangle';
+          o.connect(g);
+          g.connect(audioCtx.destination);
+          o.frequency.setValueAtTime(n.f, now + n.t);
+          g.gain.setValueAtTime(0.2, now + n.t);
+          g.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
+          o.start(now + n.t);
+          o.stop(now + n.t + n.d + 0.02);
+        });
       }
     }
 
@@ -1016,6 +1092,19 @@
     });
     document.getElementById('three-canvas').addEventListener('contextmenu', e => e.preventDefault());
 
+    // Prevent iOS Safari pinch-zoom and double-tap zoom from locking the viewport
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(evt => {
+      document.addEventListener(evt, e => e.preventDefault(), { passive: false });
+    });
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', e => {
+      const now = performance.now();
+      if (now - lastTouchEnd <= 320) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, { passive: false });
+
     (function initJoystick() {
       const zone = document.getElementById('joystick-zone');
       const knob = document.getElementById('joystick-knob');
@@ -1337,9 +1426,19 @@
       if (Math.abs(aimX) < 0.12) {
         targetX = (Math.random() - 0.5) * hw * 1.4;
       }
+      if (team === 'ai') {
+        const dCfg = DIFFICULTY[state.difficulty];
+        targetX += (Math.random() - 0.5) * dCfg.aiError;
+        // Easy AI occasionally hits wide/long to feel naturally approachable
+        if (Math.random() < dCfg.aiMissRate) {
+          targetX = (Math.random() < 0.5 ? -1 : 1) * (hw + 1.15);
+        }
+      }
 
       let depthRatio = 0.72 + Math.random() * 0.16;
-      if (team === 'p1' && Math.abs(aimZ) > 0.2) {
+      if (team === 'ai' && state.difficulty === 'easy') {
+        depthRatio = 0.45 + Math.random() * 0.22;
+      } else if (team === 'p1' && Math.abs(aimZ) > 0.2) {
         depthRatio = aimZ < 0 ? 0.88 : 0.46;
       }
       const targetZ = dirZ * (COURT_HALF_LEN * (shotType === 'lob' ? 0.86 : depthRatio));
@@ -1410,10 +1509,12 @@
         if (state.p1Games >= state.targetGames || state.aiGames >= state.targetGames) {
           state.matchOver = true;
           const youWin = state.p1Games > state.aiGames;
+          if (youWin) playSound('match_win');
           showCallout(youWin ? '🏆 比賽勝利！' : '比賽結束', `${state.p1Games} : ${state.aiGames}`, 3000);
           setTimeout(() => showMatchEndModal(youWin), 1400);
           return;
         } else {
+          if (gameWonBy === 'p1') playSound('game_win');
           showCallout(gameWonBy === 'p1' ? 'GAME! 你拿下這局' : 'GAME! 對手拿下這局', `局數 ${state.p1Games} - ${state.aiGames}`);
         }
       } else {
