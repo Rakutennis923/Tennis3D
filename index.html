@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>大滿貫 3D 卡通網球公開賽 | Grand Slam 3D Tennis</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0f172a;
+      touch-action: none;
+    }
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+    }
+    #three-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    .court-card {
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .court-card:hover {
+      transform: translateY(-2px);
+    }
+    .court-card.selected {
+      border-color: #facc15;
+      box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.45), 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+    .option-btn {
+      transition: all 0.15s ease;
+    }
+    .option-btn.selected {
+      background: linear-gradient(135deg, #facc15, #f59e0b);
+      color: #0f172a;
+      font-weight: 800;
+      border-color: #fde047;
+      box-shadow: 0 4px 14px rgba(250, 204, 21, 0.35);
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.7); opacity: 0; }
+      70% { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .callout-anim {
+      animation: popIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    /* Virtual Joystick */
+    #joystick-zone {
+      position: relative;
+      width: 124px;
+      height: 124px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      backdrop-filter: blur(6px);
+      touch-action: none;
+    }
+    #joystick-knob {
+      position: absolute;
+      width: 52px;
+      height: 52px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 9999px;
+      background: radial-gradient(circle at 35% 35%, #fef08a, #f59e0b);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      pointer-events: none;
+    }
+    .action-pad-btn {
+      touch-action: none;
+      transition: transform 0.08s ease, filter 0.08s ease;
+    }
+    .action-pad-btn:active, .action-pad-btn.pressed {
+      transform: scale(0.91);
+      filter: brightness(1.15);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="three-canvas"></canvas>
+
+    <!-- Top Scoreboard & Controls HUD -->
+    <div id="hud-top" class="hidden absolute top-0 left-0 right-0 z-20 p-2 sm:p-4 flex items-start justify-between pointer-events-none gap-2">
+      <!-- Scoreboard -->
+      <div class="glass-panel rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 text-white shadow-xl pointer-events-auto flex items-center gap-3 sm:gap-5">
+        <div class="flex flex-col">
+          <div class="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300">
+            <span id="hud-court-badge">美網 US OPEN</span>
+            <span class="text-white/40">•</span>
+            <span id="hud-mode-badge">單打</span>
+          </div>
+          <div class="mt-1 grid grid-cols-[1fr_auto_auto] gap-x-3 sm:gap-x-4 gap-y-0.5 items-center text-xs sm:text-sm">
+            <!-- Player Row -->
+            <div class="flex items-center gap-1.5 font-bold text-sky-300">
+              <span id="serve-dot-p1" class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+              <span>你 (YOU)</span>
+            </div>
+            <div class="text-center font-extrabold text-white/90 w-6" id="score-games-p1">0</div>
+            <div class="text-center font-black text-amber-300 bg-white/10 rounded px-1.5 py-0.5 min-w-[34px]" id="score-pts-p1">0</div>
+
+            <!-- AI Row -->
+            <div class="flex items-center gap-1.5 font-bold text-rose-300">
+              <span id="serve-dot-ai" class="w-2 h-2 rounded-full bg-amber-400 opacity-0 inline-block"></span>
+              <span>對手 (CPU)</span>
+            </div>
+            <div class="text-center font-extrabold text-white/90 w-6" id="score-games-ai">0</div>
+            <div class="text-center font-black text-amber-300 bg-white/10 rounded px-1.5 py-0.5 min-w-[34px]" id="score-pts-ai">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Utility Buttons -->
+      <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
+        <button id="btn-toggle-touch" title="切換觸控按鍵" class="glass-panel hover:bg-white/15 text-white rounded-xl px-2.5 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-lg">
+          <span>🎮</span>
+          <span class="hidden sm:inline">觸控</span>
+        </button>
+        <button id="btn-mute" title="音效開關" class="glass-panel hover:bg-white/15 text-white rounded-xl px-2.5 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1 shadow-lg">
+          <span id="mute-icon">🔊</span>
+        </button>
+        <button id="btn-pause" title="暫停 / 設定" class="glass-panel hover:bg-white/15 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-bold shadow-lg">
+          ⚙️ 選單
+        </button>
+      </div>
+    </div>
+
+    <!-- Top-Edge Compact Callout Banner (non-blocking on mobile) -->
+    <div id="callout-banner" class="hidden absolute top-[76px] sm:top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center max-w-[88vw]">
+      <div id="callout-box" class="callout-anim px-3.5 py-1 sm:px-5 sm:py-2 rounded-full sm:rounded-2xl bg-slate-900/55 border border-amber-400/50 shadow-lg backdrop-blur-sm">
+        <div id="callout-title" class="text-sm sm:text-2xl font-black tracking-wide text-amber-300 drop-shadow whitespace-nowrap">ACE!</div>
+        <div id="callout-sub" class="text-[11px] sm:text-sm font-semibold text-white/90 leading-tight"></div>
+      </div>
+    </div>
+
+    <!-- Serve Hint -->
+    <div id="serve-hint" class="hidden absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+      <div class="px-3 py-1 sm:px-4 sm:py-1.5 rounded-full bg-amber-400/90 text-slate-950 font-extrabold text-[11px] sm:text-sm shadow-lg whitespace-nowrap">
+        🎾 點「擊球」或空白鍵發球
+      </div>
+    </div>
+
+    <!-- Desktop Controls Hint -->
+    <div id="desktop-hint" class="hidden absolute bottom-3 left-4 z-10 pointer-events-none">
+      <div class="glass-panel rounded-xl px-3 py-1.5 text-[11px] text-white/80 flex items-center gap-3">
+        <span><b class="text-amber-300">WASD / 方向鍵</b> 移動 & 控球方向</span>
+        <span><b class="text-amber-300">空白鍵 / 左鍵</b> 擊球 (雙擊加速)</span>
+        <span><b class="text-amber-300">Shift / K / 右鍵</b> 高吊切球</span>
+      </div>
+    </div>
+
+    <!-- Mobile Touch Controls -->
+    <div id="touch-controls" class="hidden absolute inset-x-0 bottom-0 z-20 p-4 sm:p-6 flex items-end justify-between pointer-events-none">
+      <div id="joystick-zone" class="pointer-events-auto">
+        <div id="joystick-knob"></div>
+      </div>
+
+      <div class="flex items-end gap-3 pointer-events-auto">
+        <button id="btn-touch-lob" class="action-pad-btn w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-sky-400 to-blue-600 border-2 border-sky-200/70 text-white font-black text-xs sm:text-sm shadow-xl flex flex-col items-center justify-center">
+          <span class="text-lg">☁️</span>
+          <span>高吊/切</span>
+        </button>
+        <button id="btn-touch-hit" class="action-pad-btn w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-amber-300 to-orange-500 border-2 border-yellow-100/80 text-slate-950 font-black text-sm sm:text-base shadow-2xl flex flex-col items-center justify-center">
+          <span class="text-2xl">🎾</span>
+          <span>擊球</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Setup / Start Menu Modal -->
+    <div id="setup-modal" class="absolute inset-0 z-30 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto">
+      <div class="glass-panel w-full max-w-2xl rounded-3xl p-5 sm:p-7 text-white shadow-2xl my-auto max-h-[94dvh] overflow-y-auto">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-bold mb-1.5">
+              <span>🏆</span> 3D 卡通網球公開賽
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white">選擇你的比賽設定</h1>
+          </div>
+          <div class="text-4xl sm:text-5xl">🎾</div>
+        </div>
+
+        <!-- Row 1: Mode & Gender -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">比賽賽制 (單打 / 雙打)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" data-mode="singles" class="mode-btn option-btn selected rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 text-sm font-bold flex items-center justify-center gap-1.5">
+                <span>👤</span> 單打 1v1
+              </button>
+              <button type="button" data-mode="doubles" class="mode-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 text-sm font-bold flex items-center justify-center gap-1.5">
+                <span>👥</span> 雙打 2v2
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">選手性別 (3D卡通造型)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" data-gender="male" class="gender-btn option-btn selected rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 text-sm font-bold flex items-center justify-center gap-1.5">
+                <span>👦</span> 男生選手
+              </button>
+              <button type="button" data-gender="female" class="gender-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 text-sm font-bold flex items-center justify-center gap-1.5">
+                <span>👧</span> 女生選手
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: 4 Grand Slam Courts -->
+        <div class="mb-5">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">選擇大滿貫場地 (4種不同彈跳與球速)</label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <button type="button" data-court="usopen" class="court-card selected text-left rounded-2xl border-2 border-white/15 bg-slate-800/80 p-3">
+              <div class="w-full h-9 rounded-lg mb-2 flex overflow-hidden border border-white/20">
+                <div class="w-2/3 h-full bg-blue-600"></div>
+                <div class="w-1/3 h-full bg-emerald-700"></div>
+              </div>
+              <div class="font-extrabold text-sm text-white">美網 US Open</div>
+              <div class="text-[11px] text-sky-300 font-semibold">硬地 • 彈跳均衡</div>
+            </button>
+
+            <button type="button" data-court="frenchopen" class="court-card text-left rounded-2xl border-2 border-white/15 bg-slate-800/80 p-3">
+              <div class="w-full h-9 rounded-lg mb-2 flex overflow-hidden border border-white/20">
+                <div class="w-full h-full bg-[#c25934]"></div>
+              </div>
+              <div class="font-extrabold text-sm text-white">法網 Roland-Garros</div>
+              <div class="text-[11px] text-orange-300 font-semibold">紅土 • 高彈慢速</div>
+            </button>
+
+            <button type="button" data-court="wimbledon" class="court-card text-left rounded-2xl border-2 border-white/15 bg-slate-800/80 p-3">
+              <div class="w-full h-9 rounded-lg mb-2 flex overflow-hidden border border-white/20">
+                <div class="w-2/3 h-full bg-emerald-600"></div>
+                <div class="w-1/3 h-full bg-emerald-800"></div>
+              </div>
+              <div class="font-extrabold text-sm text-white">溫網 Wimbledon</div>
+              <div class="text-[11px] text-emerald-300 font-semibold">草地 • 低平快速</div>
+            </button>
+
+            <button type="button" data-court="ausopen" class="court-card text-left rounded-2xl border-2 border-white/15 bg-slate-800/80 p-3">
+              <div class="w-full h-9 rounded-lg mb-2 flex overflow-hidden border border-white/20">
+                <div class="w-2/3 h-full bg-sky-500"></div>
+                <div class="w-1/3 h-full bg-blue-900"></div>
+              </div>
+              <div class="font-extrabold text-sm text-white">澳網 Aus Open</div>
+              <div class="text-[11px] text-cyan-300 font-semibold">晴空硬地 • 明快</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Row 3: Difficulty & Match Length -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">對手難度</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" data-diff="easy" class="diff-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">輕鬆</button>
+              <button type="button" data-diff="normal" class="diff-btn option-btn selected rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">標準</button>
+              <button type="button" data-diff="hard" class="diff-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">職業</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">賽盤局數</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" data-games="2" class="games-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">搶 2 局</button>
+              <button type="button" data-games="3" class="games-btn option-btn selected rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">搶 3 局</button>
+              <button type="button" data-games="6" class="games-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">搶 6 局</button>
+            </div>
+          </div>
+        </div>
+
+        <button id="btn-start-match" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400 hover:brightness-105 text-slate-950 font-black text-lg shadow-xl transition active:scale-[0.99]">
+          🎾 開始比賽！START MATCH
+        </button>
+
+        <p class="text-center text-[11px] text-slate-400 mt-3">
+          支援電腦鍵盤滑鼠 (WASD/方向鍵 + 空白鍵) 與手機觸控搖桿操作
+        </p>
+      </div>
+    </div>
+
+    <!-- Pause / Match Over Modal -->
+    <div id="pause-modal" class="hidden absolute inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
+      <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-white text-center shadow-2xl">
+        <div id="pause-emoji" class="text-5xl mb-2">⏸️</div>
+        <h2 id="pause-title" class="text-2xl font-black mb-1">比賽暫停</h2>
+        <p id="pause-subtitle" class="text-sm text-slate-300 mb-5">隨時調整設定或繼續比賽</p>
+        <div class="flex flex-col gap-2.5">
+          <button id="btn-resume" class="w-full py-3 rounded-xl bg-amber-400 text-slate-950 font-black text-base hover:brightness-105">繼續比賽</button>
+          <button id="btn-restart-same" class="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/15">重新開始本場</button>
+          <button id="btn-back-setup" class="w-full py-3 rounded-xl bg-white/5 hover:bg-white/15 text-slate-200 font-bold text-sm border border-white/10">更換場地 / 賽制 / 性別</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. GAME CONFIGURATION & COURT DEFINITIONS
+    // =========================================================================
+    const COURTS = {
+      usopen: {
+        name: '美網 US OPEN',
+        surface: 'hard',
+        innerColor: '#1d4ed8',
+        outerColor: '#15803d',
+        lineColor: '#ffffff',
+        skyColor: 0x0f172a,
+        fogColor: 0x0f172a,
+        ambientIntensity: 0.72,
+        restitution: 0.78,
+        speedKeep: 0.88,
+        particleColor: null,
+        hasGrassStripes: false,
+        hasClayGrain: false
+      },
+      frenchopen: {
+        name: '法網 ROLAND-GARROS',
+        surface: 'clay',
+        innerColor: '#c25934',
+        outerColor: '#9e4324',
+        lineColor: '#f8fafc',
+        skyColor: 0x7dd3fc,
+        fogColor: 0xbae6fd,
+        ambientIntensity: 0.82,
+        restitution: 0.84,
+        speedKeep: 0.75,
+        particleColor: 0xd96b43,
+        hasGrassStripes: false,
+        hasClayGrain: true
+      },
+      wimbledon: {
+        name: '溫網 WIMBLEDON',
+        surface: 'grass',
+        innerColor: '#1f7a3f',
+        outerColor: '#14532d',
+        lineColor: '#ffffff',
+        skyColor: 0x93c5fd,
+        fogColor: 0xdbeafe,
+        ambientIntensity: 0.8,
+        restitution: 0.67,
+        speedKeep: 0.94,
+        particleColor: 0x4ade80,
+        hasGrassStripes: true,
+        hasClayGrain: false
+      },
+      ausopen: {
+        name: '澳網 AUS OPEN',
+        surface: 'hard',
+        innerColor: '#0284c7',
+        outerColor: '#1e3a8a',
+        lineColor: '#ffffff',
+        skyColor: 0x38bdf8,
+        fogColor: 0x7dd3fc,
+        ambientIntensity: 0.85,
+        restitution: 0.79,
+        speedKeep: 0.87,
+        particleColor: null,
+        hasGrassStripes: false,
+        hasClayGrain: false
+      }
+    };
+
+    const COURT_HALF_LEN = 11.885;
+    const SERVICE_LINE_Z = 6.40;
+    const SINGLES_HALF_W = 4.115;
+    const DOUBLES_HALF_W = 5.485;
+    const NET_HEIGHT = 0.98;
+    const GRAVITY = -19.5;
+
+    const DIFFICULTY = {
+      easy:   { aiSpeed: 5.8,  aiReact: 0.72, aiError: 1.5, aiPower: 0.82 },
+      normal: { aiSpeed: 7.8,  aiReact: 0.88, aiError: 0.75, aiPower: 0.96 },
+      hard:   { aiSpeed: 9.8,  aiReact: 0.97, aiError: 0.25, aiPower: 1.08 }
+    };
+
+    const state = {
+      mode: 'singles',
+      gender: 'male',
+      courtKey: 'usopen',
+      difficulty: 'normal',
+      targetGames: 3,
+
+      running: false,
+      paused: false,
+      matchOver: false,
+      muted: false,
+      showTouch: false,
+
+      p1Games: 0,
+      aiGames: 0,
+      p1Points: 0,
+      aiPoints: 0,
+      server: 'p1',
+
+      phase: 'menu',
+      lastHitter: null,
+      bounceCountOnSide: 0,
+      firstBounceValid: false,
+      isServeInFlight: false,
+      serveFaults: 0,
+      serveSide: 'deuce',
+      phaseTimer: 0,
+      lastHitTapTime: 0,
+      justHitTimer: 0,
+      justHitBoosted: false
+    };
+
+    // =========================================================================
+    // 2. WEB AUDIO SYNTHESIZER
+    // =========================================================================
+    let audioCtx = null;
+    function ensureAudio() {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) audioCtx = new AC();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+    }
+
+    function playSound(type) {
+      if (state.muted || !audioCtx) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'hit') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(95, now + 0.08);
+        gain.gain.setValueAtTime(0.32, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      } else if (type === 'lob') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(160, now + 0.11);
+        gain.gain.setValueAtTime(0.24, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } else if (type === 'bounce') {
+        const surf = COURTS[state.courtKey].surface;
+        osc.type = 'sine';
+        const startF = surf === 'clay' ? 120 : surf === 'grass' ? 140 : 175;
+        osc.frequency.setValueAtTime(startF, now);
+        osc.frequency.exponentialRampToValueAtTime(55, now + 0.06);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+        osc.start(now);
+        osc.stop(now + 0.07);
+      } else if (type === 'point_win') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.09);
+        osc.frequency.setValueAtTime(783.99, now + 0.18);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+        osc.start(now);
+        osc.stop(now + 0.37);
+      } else if (type === 'point_lose') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.linearRampToValueAtTime(140, now + 0.22);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } else if (type === 'net') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(110, now);
+        osc.frequency.exponentialRampToValueAtTime(65, now + 0.12);
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+        osc.start(now);
+        osc.stop(now + 0.14);
+      }
+    }
+
+    // =========================================================================
+    // 3. THREE.JS SCENE, COURT & STADIUM BUILDER
+    // =========================================================================
+    let scene, camera, renderer, dirLight, ambientLight;
+    let courtGroup = null;
+    let playersGroup = null;
+    let ballMesh, ballShadowMesh, targetRingMesh, serviceBoxMesh;
+    const particles = [];
+
+    const ball = {
+      pos: new THREE.Vector3(0, 1.2, 11),
+      vel: new THREE.Vector3(0, 0, 0),
+      active: false
+    };
+
+    const characters = [];
+
+    function initThree() {
+      const canvas = document.getElementById('three-canvas');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f172a);
+      scene.fog = new THREE.Fog(0x0f172a, 34, 78);
+
+      camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 130);
+      camera.position.set(0, 10.2, 22.8);
+      camera.lookAt(0, 0.85, 1.6);
+
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+      scene.add(ambientLight);
+
+      dirLight = new THREE.DirectionalLight(0xfffbeb, 0.95);
+      dirLight.position.set(12, 22, 14);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 1024;
+      dirLight.shadow.mapSize.height = 1024;
+      dirLight.shadow.camera.near = 2;
+      dirLight.shadow.camera.far = 55;
+      const d = 18;
+      dirLight.shadow.camera.left = -d;
+      dirLight.shadow.camera.right = d;
+      dirLight.shadow.camera.top = d;
+      dirLight.shadow.camera.bottom = -d;
+      scene.add(dirLight);
+
+      const ballGeo = new THREE.SphereGeometry(0.18, 16, 16);
+      const ballMat = new THREE.MeshStandardMaterial({
+        color: 0xd9f99d,
+        emissive: 0x84cc16,
+        emissiveIntensity: 0.25,
+        roughness: 0.45
+      });
+      ballMesh = new THREE.Mesh(ballGeo, ballMat);
+      ballMesh.castShadow = true;
+      scene.add(ballMesh);
+
+      const shGeo = new THREE.CircleGeometry(0.24, 16);
+      shGeo.rotateX(-Math.PI / 2);
+      const shMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38 });
+      ballShadowMesh = new THREE.Mesh(shGeo, shMat);
+      ballShadowMesh.position.y = 0.02;
+      scene.add(ballShadowMesh);
+
+      const ringGeo = new THREE.RingGeometry(0.24, 0.36, 24);
+      ringGeo.rotateX(-Math.PI / 2);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
+      targetRingMesh = new THREE.Mesh(ringGeo, ringMat);
+      targetRingMesh.position.y = 0.025;
+      targetRingMesh.visible = false;
+      scene.add(targetRingMesh);
+
+      const sbGeo = new THREE.PlaneGeometry(SINGLES_HALF_W, SERVICE_LINE_Z);
+      sbGeo.rotateX(-Math.PI / 2);
+      const sbMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.18, side: THREE.DoubleSide });
+      serviceBoxMesh = new THREE.Mesh(sbGeo, sbMat);
+      serviceBoxMesh.position.y = 0.018;
+      serviceBoxMesh.visible = false;
+      scene.add(serviceBoxMesh);
+
+      buildCourt(state.courtKey);
+      buildCharacters();
+
+      window.addEventListener('resize', onResize);
+    }
+
+    function onResize() {
+      if (!renderer || !camera) return;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+
+    function createCourtTexture(cfg, isInner) {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = isInner ? cfg.innerColor : cfg.outerColor;
+      ctx.fillRect(0, 0, 512, 512);
+
+      if (cfg.hasGrassStripes && isInner) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+        for (let i = 0; i < 16; i += 2) {
+          ctx.fillRect(0, i * 32, 512, 32);
+        }
+      }
+      if (cfg.hasClayGrain) {
+        for (let i = 0; i < 2400; i++) {
+          ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(60,20,5,0.08)';
+          ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    function buildCourt(courtKey) {
+      if (courtGroup) {
+        scene.remove(courtGroup);
+      }
+      courtGroup = new THREE.Group();
+      const cfg = COURTS[courtKey];
+
+      scene.background = new THREE.Color(cfg.skyColor);
+      scene.fog = new THREE.Fog(cfg.fogColor, 34, 78);
+      ambientLight.intensity = cfg.ambientIntensity;
+
+      const outerGeo = new THREE.PlaneGeometry(24, 38);
+      outerGeo.rotateX(-Math.PI / 2);
+      const outerTex = createCourtTexture(cfg, false);
+      const outerMat = new THREE.MeshStandardMaterial({ map: outerTex, roughness: 0.85 });
+      const outerMesh = new THREE.Mesh(outerGeo, outerMat);
+      outerMesh.receiveShadow = true;
+      courtGroup.add(outerMesh);
+
+      const innerGeo = new THREE.PlaneGeometry(DOUBLES_HALF_W * 2, COURT_HALF_LEN * 2);
+      innerGeo.rotateX(-Math.PI / 2);
+      const innerTex = createCourtTexture(cfg, true);
+      const innerMat = new THREE.MeshStandardMaterial({ map: innerTex, roughness: 0.8 });
+      const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+      innerMesh.position.y = 0.005;
+      innerMesh.receiveShadow = true;
+      courtGroup.add(innerMesh);
+
+      const lineMat = new THREE.MeshBasicMaterial({ color: cfg.lineColor });
+      function addLine(w, l, x, z) {
+        const g = new THREE.PlaneGeometry(w, l);
+        g.rotateX(-Math.PI / 2);
+        const m = new THREE.Mesh(g, lineMat);
+        m.position.set(x, 0.012, z);
+        courtGroup.add(m);
+      }
+      const lw = 0.09;
+      addLine(DOUBLES_HALF_W * 2 + lw, lw, 0, COURT_HALF_LEN);
+      addLine(DOUBLES_HALF_W * 2 + lw, lw, 0, -COURT_HALF_LEN);
+      addLine(lw, COURT_HALF_LEN * 2, -DOUBLES_HALF_W, 0);
+      addLine(lw, COURT_HALF_LEN * 2, DOUBLES_HALF_W, 0);
+      addLine(lw, COURT_HALF_LEN * 2, -SINGLES_HALF_W, 0);
+      addLine(lw, COURT_HALF_LEN * 2, SINGLES_HALF_W, 0);
+      addLine(SINGLES_HALF_W * 2, lw, 0, SERVICE_LINE_Z);
+      addLine(SINGLES_HALF_W * 2, lw, 0, -SERVICE_LINE_Z);
+      addLine(lw, SERVICE_LINE_Z * 2, 0, 0);
+      addLine(lw, 0.25, 0, COURT_HALF_LEN - 0.125);
+      addLine(lw, 0.25, 0, -COURT_HALF_LEN + 0.125);
+
+      const postGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.12, 12);
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+      [-DOUBLES_HALF_W - 0.4, DOUBLES_HALF_W + 0.4].forEach(px => {
+        const post = new THREE.Mesh(postGeo, postMat);
+        post.position.set(px, 0.56, 0);
+        post.castShadow = true;
+        courtGroup.add(post);
+      });
+
+      const netGeo = new THREE.PlaneGeometry((DOUBLES_HALF_W + 0.4) * 2, NET_HEIGHT);
+      const netMat = new THREE.MeshStandardMaterial({
+        color: 0x0f172a,
+        transparent: true,
+        opacity: 0.62,
+        side: THREE.DoubleSide
+      });
+      const netMesh = new THREE.Mesh(netGeo, netMat);
+      netMesh.position.set(0, NET_HEIGHT / 2, 0);
+      courtGroup.add(netMesh);
+
+      const tapeGeo = new THREE.BoxGeometry((DOUBLES_HALF_W + 0.4) * 2, 0.08, 0.06);
+      const tapeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+      const tapeMesh = new THREE.Mesh(tapeGeo, tapeMat);
+      tapeMesh.position.set(0, NET_HEIGHT, 0);
+      courtGroup.add(tapeMesh);
+
+      const wallMat = new THREE.MeshStandardMaterial({ color: cfg.outerColor, roughness: 0.7 });
+      const backWallGeo = new THREE.BoxGeometry(24, 1.3, 0.4);
+      [-19, 19].forEach(wz => {
+        const wall = new THREE.Mesh(backWallGeo, wallMat);
+        wall.position.set(0, 0.65, wz);
+        wall.receiveShadow = true;
+        courtGroup.add(wall);
+      });
+      const sideWallGeo = new THREE.BoxGeometry(0.4, 1.3, 38);
+      [-12, 12].forEach(wx => {
+        const wall = new THREE.Mesh(sideWallGeo, wallMat);
+        wall.position.set(wx, 0.65, 0);
+        courtGroup.add(wall);
+      });
+
+      const standMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 });
+      const crowdColors = [0xfef08a, 0x38bdf8, 0xfb7185, 0x4ade80, 0xffffff, 0xc084fc];
+      function addBleacher(x, y, z, w, h, d, countX, countZ) {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), standMat);
+        b.position.set(x, y, z);
+        courtGroup.add(b);
+        const specGeo = new THREE.SphereGeometry(0.24, 8, 8);
+        for (let i = 0; i < countX; i++) {
+          for (let j = 0; j < countZ; j++) {
+            if ((i + j) % 2 === 0) continue;
+            const c = crowdColors[(i * 7 + j * 3) % crowdColors.length];
+            const sm = new THREE.Mesh(specGeo, new THREE.MeshStandardMaterial({ color: c }));
+            const sx = x - w / 2 + ((i + 0.5) / countX) * w;
+            const sz = z - d / 2 + ((j + 0.5) / countZ) * d;
+            sm.position.set(sx, y + h / 2 + 0.22, sz);
+            courtGroup.add(sm);
+          }
+        }
+      }
+      addBleacher(-14.5, 1.2, 0, 4.2, 2.4, 34, 2, 18);
+      addBleacher(14.5, 1.2, 0, 4.2, 2.4, 34, 2, 18);
+      addBleacher(0, 1.4, -21.5, 24, 2.8, 4.5, 14, 2);
+
+      scene.add(courtGroup);
+    }
+
+    // =========================================================================
+    // 4. 3D CARTOON CHARACTER BUILDER (MALE & FEMALE)
+    // =========================================================================
+    function createCartoonPlayer({ gender, shirtColor, accentColor, skinColor, hairColor, facingZ }) {
+      const root = new THREE.Group();
+
+      const skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.65 });
+      const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.55 });
+      const accentMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.6 });
+      const hairMat = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.7 });
+      const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+      const darkMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
+
+      const legGeo = new THREE.CylinderGeometry(0.11, 0.09, 0.68, 10);
+      const shoeGeo = new THREE.BoxGeometry(0.22, 0.14, 0.34);
+
+      const leftLeg = new THREE.Group();
+      leftLeg.position.set(-0.18, 0.68, 0);
+      const lLegMesh = new THREE.Mesh(legGeo, skinMat);
+      lLegMesh.position.y = -0.34;
+      lLegMesh.castShadow = true;
+      const lShoe = new THREE.Mesh(shoeGeo, whiteMat);
+      lShoe.position.set(0, -0.62, facingZ * 0.06);
+      lShoe.castShadow = true;
+      leftLeg.add(lLegMesh, lShoe);
+      root.add(leftLeg);
+
+      const rightLeg = new THREE.Group();
+      rightLeg.position.set(0.18, 0.68, 0);
+      const rLegMesh = new THREE.Mesh(legGeo, skinMat);
+      rLegMesh.position.y = -0.34;
+      rLegMesh.castShadow = true;
+      const rShoe = new THREE.Mesh(shoeGeo, whiteMat);
+      rShoe.position.set(0, -0.62, facingZ * 0.06);
+      rShoe.castShadow = true;
+      rightLeg.add(rLegMesh, rShoe);
+      root.add(rightLeg);
+
+      if (gender === 'female') {
+        const skirtGeo = new THREE.CylinderGeometry(0.28, 0.44, 0.38, 16);
+        const skirt = new THREE.Mesh(skirtGeo, accentMat);
+        skirt.position.y = 0.78;
+        skirt.castShadow = true;
+        root.add(skirt);
+      } else {
+        const shortsGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.34, 14);
+        const shorts = new THREE.Mesh(shortsGeo, accentMat);
+        shorts.position.y = 0.78;
+        shorts.castShadow = true;
+        root.add(shorts);
+      }
+
+      const torsoGeo = new THREE.CylinderGeometry(
+        gender === 'female' ? 0.26 : 0.32,
+        0.26,
+        0.64,
+        14
+      );
+      const torso = new THREE.Mesh(torsoGeo, shirtMat);
+      torso.position.y = 1.22;
+      torso.castShadow = true;
+      root.add(torso);
+
+      const headGroup = new THREE.Group();
+      headGroup.position.y = 1.84;
+      const headGeo = new THREE.SphereGeometry(0.36, 18, 18);
+      const head = new THREE.Mesh(headGeo, skinMat);
+      head.castShadow = true;
+      headGroup.add(head);
+
+      const eyeGeo = new THREE.SphereGeometry(0.055, 10, 10);
+      const lEye = new THREE.Mesh(eyeGeo, darkMat);
+      lEye.position.set(-0.12, 0.04, facingZ * 0.32);
+      const rEye = new THREE.Mesh(eyeGeo, darkMat);
+      rEye.position.set(0.12, 0.04, facingZ * 0.32);
+      headGroup.add(lEye, rEye);
+
+      const blushMat = new THREE.MeshBasicMaterial({ color: 0xfb7185, transparent: true, opacity: 0.45 });
+      const blushGeo = new THREE.CircleGeometry(0.055, 10);
+      const lBlush = new THREE.Mesh(blushGeo, blushMat);
+      lBlush.position.set(-0.2, -0.04, facingZ * 0.31);
+      if (facingZ < 0) lBlush.rotation.y = Math.PI;
+      const rBlush = new THREE.Mesh(blushGeo, blushMat);
+      rBlush.position.set(0.2, -0.04, facingZ * 0.31);
+      if (facingZ < 0) rBlush.rotation.y = Math.PI;
+      headGroup.add(lBlush, rBlush);
+
+      const hairCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.38, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.56),
+        hairMat
+      );
+      hairCap.position.y = 0.04;
+      headGroup.add(hairCap);
+
+      if (gender === 'female') {
+        const pony = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), hairMat);
+        pony.scale.set(0.85, 1.35, 0.9);
+        pony.position.set(0, 0.02, -facingZ * 0.38);
+        headGroup.add(pony);
+
+        const visorBand = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.04, 8, 20), whiteMat);
+        visorBand.rotation.x = Math.PI / 2;
+        visorBand.position.y = 0.14;
+        headGroup.add(visorBand);
+
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.03, 14, 1, false, -0.9, 1.8), whiteMat);
+        brim.position.set(0, 0.14, facingZ * 0.18);
+        if (facingZ < 0) brim.rotation.y = Math.PI;
+        headGroup.add(brim);
+      } else {
+        const band = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.045, 8, 20), accentMat);
+        band.rotation.x = Math.PI / 2;
+        band.position.y = 0.15;
+        headGroup.add(band);
+
+        const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.24, 8), hairMat);
+        tuft.position.set(0, 0.42, facingZ * 0.06);
+        headGroup.add(tuft);
+      }
+
+      root.add(headGroup);
+
+      const leftArm = new THREE.Group();
+      leftArm.position.set(-0.38, 1.44, 0);
+      const armGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.56, 10);
+      const lArmMesh = new THREE.Mesh(armGeo, skinMat);
+      lArmMesh.position.y = -0.25;
+      lArmMesh.castShadow = true;
+      leftArm.add(lArmMesh);
+      root.add(leftArm);
+
+      const rightArm = new THREE.Group();
+      rightArm.position.set(0.42, 1.44, 0);
+      const rArmMesh = new THREE.Mesh(armGeo, skinMat);
+      rArmMesh.position.y = -0.25;
+      rArmMesh.castShadow = true;
+      rightArm.add(rArmMesh);
+
+      const racketPivot = new THREE.Group();
+      racketPivot.position.set(0, -0.52, 0);
+
+      const handle = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.038, 0.042, 0.46, 8),
+        darkMat
+      );
+      handle.rotation.x = facingZ * (Math.PI / 2.15);
+      handle.position.set(0, 0, facingZ * 0.22);
+      racketPivot.add(handle);
+
+      const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.30, 0.036, 10, 22),
+        accentMat
+      );
+      rim.scale.set(0.88, 1.18, 1);
+      rim.position.set(0, 0.1, facingZ * 0.72);
+      racketPivot.add(rim);
+
+      const strings = new THREE.Mesh(
+        new THREE.CircleGeometry(0.28, 18),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+      );
+      strings.scale.set(0.88, 1.18, 1);
+      strings.position.copy(rim.position);
+      racketPivot.add(strings);
+
+      rightArm.add(racketPivot);
+      root.add(rightArm);
+
+      // Glowing 3D Swing Arc Trail for clear forehand/backhand/serve/smash feedback
+      const trailGeo = new THREE.RingGeometry(0.55, 1.15, 20, 1, -0.4, Math.PI * 0.95);
+      const trailMat = new THREE.MeshBasicMaterial({
+        color: 0xfacc15,
+        transparent: true,
+        opacity: 0.0,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const swingTrail = new THREE.Mesh(trailGeo, trailMat);
+      swingTrail.position.set(0, 1.25, facingZ * 0.35);
+      root.add(swingTrail);
+
+      const footSh = new THREE.Mesh(
+        new THREE.CircleGeometry(0.42, 14),
+        new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28 })
+      );
+      footSh.rotation.x = -Math.PI / 2;
+      footSh.position.y = 0.015;
+      root.add(footSh);
+
+      return { root, leftArm, rightArm, racketPivot, leftLeg, rightLeg, swingTrail };
+    }
+
+    function buildCharacters() {
+      if (playersGroup) scene.remove(playersGroup);
+      playersGroup = new THREE.Group();
+      characters.length = 0;
+
+      const userGender = state.gender;
+      const partnerGender = userGender === 'male' ? 'female' : 'male';
+
+      const roster = state.mode === 'singles'
+        ? [
+            { id: 'p1', team: 'p1', role: 'user', gender: userGender, shirt: 0x0ea5e9, accent: 0xfacc15, skin: 0xfcd5b5, hair: 0x1e293b, x: 0, z: 11.2, facing: -1 },
+            { id: 'ai1', team: 'ai', role: 'ai', gender: userGender === 'male' ? 'female' : 'male', shirt: 0xf43f5e, accent: 0xffffff, skin: 0xf5cba7, hair: 0x451a03, x: 0, z: -11.2, facing: 1 }
+          ]
+        : [
+            { id: 'p1', team: 'p1', role: 'user', gender: userGender, shirt: 0x0ea5e9, accent: 0xfacc15, skin: 0xfcd5b5, hair: 0x1e293b, x: -2.3, z: 11.2, facing: -1 },
+            { id: 'p2', team: 'p1', role: 'partner', gender: partnerGender, shirt: 0x0284c7, accent: 0xfde047, skin: 0xfde2c8, hair: 0x78350f, x: 2.3, z: 4.5, facing: -1 },
+            { id: 'ai1', team: 'ai', role: 'ai', gender: 'male', shirt: 0xf43f5e, accent: 0xffffff, skin: 0xf5cba7, hair: 0x1c1917, x: 2.3, z: -11.2, facing: 1 },
+            { id: 'ai2', team: 'ai', role: 'ai', gender: 'female', shirt: 0xe11d48, accent: 0xfef08a, skin: 0xfcd5b5, hair: 0x92400e, x: -2.3, z: -4.5, facing: 1 }
+          ];
+
+      roster.forEach(r => {
+        const rig = createCartoonPlayer({
+          gender: r.gender,
+          shirtColor: r.shirt,
+          accentColor: r.accent,
+          skinColor: r.skin,
+          hairColor: r.hair,
+          facingZ: r.facing
+        });
+        rig.root.position.set(r.x, 0, r.z);
+        playersGroup.add(rig.root);
+        characters.push({
+          ...r,
+          ...rig,
+          pos: rig.root.position,
+          velX: 0,
+          velZ: 0,
+          swingTimer: 0,
+          swingDuration: 0.38,
+          swingType: 'forehand',
+          baseX: r.x,
+          baseZ: r.z
+        });
+      });
+
+      scene.add(playersGroup);
+    }
+
+    // =========================================================================
+    // 5. INPUT HANDLING (KEYBOARD + MOUSE + MOBILE TOUCH JOYSTICK)
+    // =========================================================================
+    const keys = {};
+    const joyVec = { x: 0, y: 0 };
+
+    window.addEventListener('keydown', e => {
+      keys[e.code] = true;
+      if (e.code === 'Space' || e.code === 'KeyJ') {
+        e.preventDefault();
+        triggerPlayerAction('normal');
+      } else if (e.code === 'KeyK' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        e.preventDefault();
+        triggerPlayerAction('lob');
+      } else if (e.code === 'Escape' && state.running) {
+        togglePause();
+      }
+    });
+    window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+    document.getElementById('three-canvas').addEventListener('mousedown', e => {
+      if (!state.running || state.paused) return;
+      ensureAudio();
+      if (e.button === 2) triggerPlayerAction('lob');
+      else if (e.button === 0) triggerPlayerAction('normal');
+    });
+    document.getElementById('three-canvas').addEventListener('contextmenu', e => e.preventDefault());
+
+    (function initJoystick() {
+      const zone = document.getElementById('joystick-zone');
+      const knob = document.getElementById('joystick-knob');
+      let activeId = null;
+      const maxR = 42;
+
+      function updateJoy(clientX, clientY) {
+        const rect = zone.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        let dx = clientX - cx;
+        let dy = clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > maxR) {
+          dx = (dx / dist) * maxR;
+          dy = (dy / dist) * maxR;
+        }
+        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        joyVec.x = dx / maxR;
+        joyVec.y = dy / maxR;
+      }
+
+      function resetJoy() {
+        activeId = null;
+        knob.style.transform = 'translate(-50%, -50%)';
+        joyVec.x = 0;
+        joyVec.y = 0;
+      }
+
+      zone.addEventListener('pointerdown', e => {
+        ensureAudio();
+        activeId = e.pointerId;
+        zone.setPointerCapture(e.pointerId);
+        updateJoy(e.clientX, e.clientY);
+      });
+      zone.addEventListener('pointermove', e => {
+        if (e.pointerId === activeId) updateJoy(e.clientX, e.clientY);
+      });
+      zone.addEventListener('pointerup', e => { if (e.pointerId === activeId) resetJoy(); });
+      zone.addEventListener('pointercancel', resetJoy);
+
+      const btnHit = document.getElementById('btn-touch-hit');
+      const btnLob = document.getElementById('btn-touch-lob');
+      btnHit.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        ensureAudio();
+        btnHit.classList.add('pressed');
+        triggerPlayerAction('normal');
+      });
+      btnHit.addEventListener('pointerup', () => btnHit.classList.remove('pressed'));
+      btnHit.addEventListener('pointercancel', () => btnHit.classList.remove('pressed'));
+
+      btnLob.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        ensureAudio();
+        btnLob.classList.add('pressed');
+        triggerPlayerAction('lob');
+      });
+      btnLob.addEventListener('pointerup', () => btnLob.classList.remove('pressed'));
+      btnLob.addEventListener('pointercancel', () => btnLob.classList.remove('pressed'));
+    })();
+
+    // =========================================================================
+    // 6. TENNIS PHYSICS, SCORING & AI LOGIC
+    // =========================================================================
+    function getCourtHalfWidth() {
+      return state.mode === 'doubles' ? DOUBLES_HALF_W : SINGLES_HALF_W;
+    }
+
+    function formatPointText(p, other) {
+      if (p < 3 && other < 3) return ['0', '15', '30'][p];
+      if (p === 3 && other < 3) return '40';
+      if (p < 3 && other === 3) return ['0', '15', '30'][p];
+      if (p === other) return '40';
+      return p > other ? 'AD' : '40';
+    }
+
+    function updateScoreHUD() {
+      document.getElementById('score-games-p1').textContent = state.p1Games;
+      document.getElementById('score-games-ai').textContent = state.aiGames;
+      document.getElementById('score-pts-p1').textContent = formatPointText(state.p1Points, state.aiPoints);
+      document.getElementById('score-pts-ai').textContent = formatPointText(state.aiPoints, state.p1Points);
+
+      document.getElementById('serve-dot-p1').style.opacity = state.server === 'p1' ? '1' : '0';
+      document.getElementById('serve-dot-ai').style.opacity = state.server === 'ai' ? '1' : '0';
+
+      document.getElementById('hud-court-badge').textContent = COURTS[state.courtKey].name;
+      document.getElementById('hud-mode-badge').textContent = state.mode === 'singles' ? '單打' : '雙打';
+    }
+
+    let calloutTimeout = null;
+    function showCallout(title, sub = '', duration = 1400) {
+      const banner = document.getElementById('callout-banner');
+      document.getElementById('callout-title').textContent = title;
+      document.getElementById('callout-sub').textContent = sub;
+      banner.classList.remove('hidden');
+      const box = document.getElementById('callout-box');
+      box.classList.remove('callout-anim');
+      void box.offsetWidth;
+      box.classList.add('callout-anim');
+      if (calloutTimeout) clearTimeout(calloutTimeout);
+      calloutTimeout = setTimeout(() => {
+        banner.classList.add('hidden');
+      }, duration);
+    }
+
+    function spawnParticles(x, z, color) {
+      if (!color) return;
+      for (let i = 0; i < 6; i++) {
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(0.06, 6, 6),
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 })
+        );
+        m.position.set(x, 0.08, z);
+        scene.add(m);
+        particles.push({
+          mesh: m,
+          vx: (Math.random() - 0.5) * 2.5,
+          vy: 1.2 + Math.random() * 1.4,
+          vz: (Math.random() - 0.5) * 2.5,
+          life: 0.45
+        });
+      }
+    }
+
+    function getDiagonalServiceBoxBounds(serverTeam, serveSide) {
+      if (serverTeam === 'p1') {
+        const minX = serveSide === 'deuce' ? -SINGLES_HALF_W : 0;
+        const maxX = serveSide === 'deuce' ? 0 : SINGLES_HALF_W;
+        return { minX, maxX, minZ: -SERVICE_LINE_Z, maxZ: 0 };
+      } else {
+        const minX = serveSide === 'deuce' ? 0 : -SINGLES_HALF_W;
+        const maxX = serveSide === 'deuce' ? SINGLES_HALF_W : 0;
+        return { minX, maxX, minZ: 0, maxZ: SERVICE_LINE_Z };
+      }
+    }
+
+    function positionForServe() {
+      state.phase = 'serve_wait';
+      state.bounceCountOnSide = 0;
+      state.firstBounceValid = false;
+      state.isServeInFlight = false;
+      state.lastHitter = null;
+      ball.active = false;
+
+      const isDeuceSide = (state.p1Points + state.aiPoints) % 2 === 0;
+      state.serveSide = isDeuceSide ? 'deuce' : 'ad';
+
+      const userChar = characters.find(c => c.role === 'user');
+      const aiMain = characters.find(c => c.id === 'ai1');
+
+      const p1X = isDeuceSide ? 2.1 : -2.1;
+      const aiX = isDeuceSide ? -2.1 : 2.1;
+
+      if (state.mode === 'doubles') {
+        const p2 = characters.find(c => c.role === 'partner');
+        const ai2 = characters.find(c => c.id === 'ai2');
+        if (p2) {
+          p2.pos.set(-p1X, 0, 4.4);
+          p2.baseX = -p1X;
+        }
+        if (ai2) {
+          ai2.pos.set(-aiX, 0, -4.4);
+          ai2.baseX = -aiX;
+        }
+      }
+
+      userChar.baseX = p1X;
+      aiMain.baseX = aiX;
+
+      if (state.server === 'p1') {
+        userChar.pos.set(p1X, 0, COURT_HALF_LEN + 0.35);
+        aiMain.pos.set(aiX, 0, -COURT_HALF_LEN - 0.25);
+        ball.pos.set(p1X + 0.35, 1.35, COURT_HALF_LEN + 0.15);
+        document.getElementById('serve-hint').classList.remove('hidden');
+
+        const b = getDiagonalServiceBoxBounds('p1', state.serveSide);
+        serviceBoxMesh.position.set((b.minX + b.maxX) / 2, 0.018, (b.minZ + b.maxZ) / 2);
+        serviceBoxMesh.visible = true;
+      } else {
+        aiMain.pos.set(aiX, 0, -COURT_HALF_LEN - 0.35);
+        userChar.pos.set(p1X, 0, COURT_HALF_LEN + 0.25);
+        ball.pos.set(aiX - 0.35, 1.35, -COURT_HALF_LEN - 0.15);
+        document.getElementById('serve-hint').classList.add('hidden');
+        serviceBoxMesh.visible = false;
+        state.phaseTimer = 0.95;
+      }
+      targetRingMesh.visible = false;
+    }
+
+    function setupNextPoint() {
+      if (state.matchOver) return;
+      state.serveFaults = 0;
+      positionForServe();
+    }
+
+    function launchBallToTarget(fromPos, targetX, targetZ, flightTime, peakExtra = 0) {
+      const dx = targetX - fromPos.x;
+      const dz = targetZ - fromPos.z;
+      ball.vel.x = dx / flightTime;
+      ball.vel.z = dz / flightTime;
+      ball.vel.y = (0.18 - fromPos.y - 0.5 * GRAVITY * flightTime * flightTime) / flightTime + peakExtra;
+      ball.active = true;
+    }
+
+    function triggerPlayerAction(shotType) {
+      if (!state.running || state.paused || state.matchOver) return;
+      ensureAudio();
+
+      const now = performance.now();
+      const isDoubleTap = (now - state.lastHitTapTime) < 340;
+      state.lastHitTapTime = now;
+
+      const userChar = characters.find(c => c.role === 'user');
+      if (!userChar) return;
+
+      if (state.phase === 'rally' && state.lastHitter === 'p1' && state.justHitTimer > 0 && !state.justHitBoosted && isDoubleTap) {
+        state.justHitBoosted = true;
+        ball.vel.x *= 1.26;
+        ball.vel.z *= 1.26;
+        ball.vel.y = ball.vel.y * 0.82 + 0.8;
+        playSound('hit');
+        showCallout('⚡ 加速強擊！', '', 600);
+        return;
+      }
+
+      if (state.phase === 'serve_wait' && state.server === 'p1') {
+        document.getElementById('serve-hint').classList.add('hidden');
+        serviceBoxMesh.visible = false;
+        userChar.swingType = 'serve';
+        userChar.swingDuration = 0.46;
+        userChar.swingTimer = 0.46;
+        state.phase = 'rally';
+        state.lastHitter = 'p1';
+        state.isServeInFlight = true;
+        state.bounceCountOnSide = 0;
+        state.firstBounceValid = false;
+        state.justHitTimer = 0.28;
+        state.justHitBoosted = isDoubleTap;
+
+        const box = getDiagonalServiceBoxBounds('p1', state.serveSide);
+        const aim = getPlayerAimVec();
+        const boxCenterX = (box.minX + box.maxX) / 2;
+        const targetX = Math.max(box.minX + 0.35, Math.min(box.maxX - 0.35, boxCenterX + aim.x * 1.45));
+        const depthFactor = aim.z < -0.2 ? 0.86 : aim.z > 0.2 ? 0.56 : 0.72;
+        const targetZ = -SERVICE_LINE_Z * (shotType === 'lob' ? 0.82 : depthFactor);
+        let flight = shotType === 'lob' ? 0.92 : 0.74;
+        if (isDoubleTap) {
+          flight *= 0.76;
+          showCallout('⚡ 加速發球！', '', 600);
+        }
+        ball.pos.set(userChar.pos.x + 0.25, 2.25, userChar.pos.z - 0.4);
+        launchBallToTarget(ball.pos, targetX, targetZ, flight);
+        playSound('hit');
+        return;
+      }
+
+      if (state.phase === 'rally' && state.lastHitter === 'ai') {
+        if (state.isServeInFlight && state.bounceCountOnSide === 0) {
+          userChar.swingType = ball.pos.x < userChar.pos.x ? 'backhand' : 'forehand';
+          userChar.swingDuration = 0.32;
+          userChar.swingTimer = 0.32;
+          return;
+        }
+        const dist = Math.hypot(ball.pos.x - userChar.pos.x, ball.pos.z - userChar.pos.z);
+        if (dist < 2.95 && ball.pos.y < 3.6) {
+          state.isServeInFlight = false;
+          performHit(userChar, 'p1', shotType, getPlayerAimVec(), isDoubleTap);
+        } else {
+          userChar.swingType = ball.pos.x < userChar.pos.x ? 'backhand' : 'forehand';
+          userChar.swingDuration = 0.36;
+          userChar.swingTimer = 0.36;
+        }
+      }
+    }
+
+    function getPlayerAimVec() {
+      let bx = joyVec.x;
+      let bz = joyVec.y;
+      if (keys['KeyA'] || keys['ArrowLeft']) bx -= 1;
+      if (keys['KeyD'] || keys['ArrowRight']) bx += 1;
+      if (keys['KeyW'] || keys['ArrowUp']) bz -= 1;
+      if (keys['KeyS'] || keys['ArrowDown']) bz += 1;
+      return {
+        x: Math.max(-1, Math.min(1, bx)),
+        z: Math.max(-1, Math.min(1, bz))
+      };
+    }
+
+    function detectSwingType(char, team) {
+      if (ball.pos.y >= 1.72) return 'smash';
+      if (team === 'p1') {
+        return ball.pos.x < char.pos.x - 0.12 ? 'backhand' : 'forehand';
+      }
+      return ball.pos.x > char.pos.x + 0.12 ? 'backhand' : 'forehand';
+    }
+
+    function performHit(char, team, shotType, aim = { x: 0, z: 0 }, isPower = false) {
+      const aimX = typeof aim === 'number' ? aim : aim.x;
+      const aimZ = typeof aim === 'number' ? 0 : aim.z;
+
+      const sType = detectSwingType(char, team);
+      char.swingType = sType;
+      char.swingDuration = sType === 'smash' ? 0.42 : 0.36;
+      char.swingTimer = char.swingDuration;
+
+      state.lastHitter = team;
+      state.bounceCountOnSide = 0;
+      state.firstBounceValid = false;
+      if (team === 'p1') {
+        state.justHitTimer = 0.28;
+        state.justHitBoosted = isPower;
+      }
+
+      const hw = getCourtHalfWidth() * 0.90;
+      const dirZ = team === 'p1' ? -1 : 1;
+
+      let targetX = aimX * hw;
+      if (Math.abs(aimX) < 0.12) {
+        targetX = (Math.random() - 0.5) * hw * 1.4;
+      }
+
+      let depthRatio = 0.72 + Math.random() * 0.16;
+      if (team === 'p1' && Math.abs(aimZ) > 0.2) {
+        depthRatio = aimZ < 0 ? 0.88 : 0.46;
+      }
+      const targetZ = dirZ * (COURT_HALF_LEN * (shotType === 'lob' ? 0.86 : depthRatio));
+
+      let flight = shotType === 'lob' ? 1.38 : (0.72 + Math.random() * 0.12) / (team === 'ai' ? DIFFICULTY[state.difficulty].aiPower : 1.0);
+      if (isPower && shotType !== 'lob') {
+        flight *= 0.74;
+        if (team === 'p1' && sType !== 'smash') showCallout('⚡ 加速強擊！', '', 600);
+      }
+      if (sType === 'smash' && shotType !== 'lob') {
+        flight *= 0.72;
+        if (team === 'p1') showCallout('💥 扣殺 SMASH!', '', 650);
+      }
+
+      launchBallToTarget(ball.pos, targetX, targetZ, flight);
+      playSound(shotType === 'lob' ? 'lob' : 'hit');
+    }
+
+    function handleServeFault(reasonText) {
+      if (state.phase !== 'rally') return;
+      ball.active = false;
+      targetRingMesh.visible = false;
+      serviceBoxMesh.visible = false;
+
+      if (state.serveFaults === 0) {
+        state.serveFaults = 1;
+        state.phase = 'point_end';
+        state.phaseTimer = 1.15;
+        playSound('net');
+        showCallout(`FAULT • ${reasonText}`, '一發失誤，請進行二發', 1100);
+      } else {
+        const receiver = state.server === 'p1' ? 'ai' : 'p1';
+        awardPoint(receiver, '雙發失誤 DOUBLE FAULT');
+      }
+    }
+
+    function awardPoint(winnerTeam, reason) {
+      if (state.phase === 'point_end') return;
+      state.phase = 'point_end';
+      state.phaseTimer = 1.45;
+      state.isServeInFlight = false;
+      ball.active = false;
+      targetRingMesh.visible = false;
+      serviceBoxMesh.visible = false;
+
+      if (winnerTeam === 'p1') {
+        state.p1Points++;
+        playSound('point_win');
+      } else {
+        state.aiPoints++;
+        playSound('point_lose');
+      }
+
+      const p1 = state.p1Points;
+      const ai = state.aiPoints;
+      let gameWonBy = null;
+      if (p1 >= 4 && p1 - ai >= 2) gameWonBy = 'p1';
+      else if (ai >= 4 && ai - p1 >= 2) gameWonBy = 'ai';
+
+      if (gameWonBy) {
+        if (gameWonBy === 'p1') state.p1Games++;
+        else state.aiGames++;
+        state.p1Points = 0;
+        state.aiPoints = 0;
+        state.server = state.server === 'p1' ? 'ai' : 'p1';
+        updateScoreHUD();
+
+        if (state.p1Games >= state.targetGames || state.aiGames >= state.targetGames) {
+          state.matchOver = true;
+          const youWin = state.p1Games > state.aiGames;
+          showCallout(youWin ? '🏆 比賽勝利！' : '比賽結束', `${state.p1Games} : ${state.aiGames}`, 3000);
+          setTimeout(() => showMatchEndModal(youWin), 1400);
+          return;
+        } else {
+          showCallout(gameWonBy === 'p1' ? 'GAME! 你拿下這局' : 'GAME! 對手拿下這局', `局數 ${state.p1Games} - ${state.aiGames}`);
+        }
+      } else {
+        updateScoreHUD();
+        const label = winnerTeam === 'p1' ? `${reason} • 你得分！` : `${reason} • 對手得分`;
+        let scoreSub = `${formatPointText(p1, ai)} - ${formatPointText(ai, p1)}`;
+        if (p1 >= 3 && ai >= 3) {
+          if (p1 === ai) scoreSub = 'DEUCE 平分 (須連贏2分)';
+          else if (p1 > ai) scoreSub = '你 佔先 AD (再1分贏這局)';
+          else scoreSub = '對手 佔先 AD';
+        }
+        showCallout(label, scoreSub);
+      }
+    }
+
+    function showMatchEndModal(youWin) {
+      state.paused = true;
+      document.getElementById('pause-emoji').textContent = youWin ? '🏆' : '🎾';
+      document.getElementById('pause-title').textContent = youWin ? '恭喜奪得大滿貫！' : '再接再厲！';
+      document.getElementById('pause-subtitle').textContent = `最終局數比數：你 ${state.p1Games} - ${state.aiGames} 對手`;
+      document.getElementById('btn-resume').classList.add('hidden');
+      document.getElementById('pause-modal').classList.remove('hidden');
+    }
+
+    // =========================================================================
+    // 7. MAIN UPDATE LOOP
+    // =========================================================================
+    let lastTime = performance.now();
+
+    function update(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life -= dt;
+        p.mesh.position.x += p.vx * dt;
+        p.mesh.position.y += p.vy * dt;
+        p.mesh.position.z += p.vz * dt;
+        p.vy -= 6 * dt;
+        p.mesh.material.opacity = Math.max(0, p.life * 1.8);
+        if (p.life <= 0) {
+          scene.remove(p.mesh);
+          particles.splice(i, 1);
+        }
+      }
+
+      if (!state.running || state.paused) return;
+
+      if (state.justHitTimer > 0) {
+        state.justHitTimer = Math.max(0, state.justHitTimer - dt);
+      }
+
+      if (state.phase === 'serve_wait' && state.server === 'ai') {
+        state.phaseTimer -= dt;
+        if (state.phaseTimer <= 0) {
+          const aiMain = characters.find(c => c.id === 'ai1');
+          aiMain.swingType = 'serve';
+          aiMain.swingDuration = 0.46;
+          aiMain.swingTimer = 0.46;
+          state.phase = 'rally';
+          state.lastHitter = 'ai';
+          state.isServeInFlight = true;
+          state.bounceCountOnSide = 0;
+          state.firstBounceValid = false;
+
+          const box = getDiagonalServiceBoxBounds('ai', state.serveSide);
+          const boxCenterX = (box.minX + box.maxX) / 2;
+          const targetX = boxCenterX + (Math.random() - 0.5) * 1.4;
+          const targetZ = SERVICE_LINE_Z * 0.72;
+          ball.pos.set(aiMain.pos.x - 0.25, 2.25, aiMain.pos.z + 0.4);
+          launchBallToTarget(ball.pos, targetX, targetZ, 0.84 / DIFFICULTY[state.difficulty].aiPower);
+          playSound('hit');
+        }
+      }
+
+      if (state.phase === 'point_end') {
+        state.phaseTimer -= dt;
+        if (state.phaseTimer <= 0) {
+          if (state.serveFaults === 1 && !state.isServeInFlight && state.lastHitter !== null) {
+            positionForServe();
+          } else {
+            setupNextPoint();
+          }
+        }
+      }
+
+      const userChar = characters.find(c => c.role === 'user');
+      if (userChar && state.phase !== 'point_end') {
+        let mx = joyVec.x;
+        let mz = joyVec.y;
+        if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1;
+        if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+        if (keys['KeyW'] || keys['ArrowUp']) mz -= 1;
+        if (keys['KeyS'] || keys['ArrowDown']) mz += 1;
+
+        const len = Math.hypot(mx, mz);
+        if (len > 1) { mx /= len; mz /= len; }
+
+        const moveSpeed = 9.2;
+        if (state.phase === 'serve_wait' && state.server === 'p1') {
+          const minServeX = state.serveSide === 'deuce' ? 0.35 : -getCourtHalfWidth();
+          const maxServeX = state.serveSide === 'deuce' ? getCourtHalfWidth() : -0.35;
+          userChar.pos.x = Math.max(minServeX, Math.min(maxServeX, userChar.pos.x + mx * 4 * dt));
+          ball.pos.x = userChar.pos.x + 0.35;
+        } else {
+          userChar.pos.x += mx * moveSpeed * dt;
+          userChar.pos.z += mz * moveSpeed * dt;
+        }
+
+        const boundX = getCourtHalfWidth() + 1.4;
+        userChar.pos.x = Math.max(-boundX, Math.min(boundX, userChar.pos.x));
+        userChar.pos.z = Math.max(1.2, Math.min(COURT_HALF_LEN + 2.6, userChar.pos.z));
+        userChar.velX = mx * moveSpeed;
+        userChar.velZ = mz * moveSpeed;
+      }
+
+      const diffCfg = DIFFICULTY[state.difficulty];
+      characters.forEach(ch => {
+        if (ch.role === 'user') return;
+
+        let targetX = ch.baseX;
+        let targetZ = ch.baseZ;
+
+        if (state.phase === 'rally' && ball.active) {
+          const ballGoingToTeam = (ch.team === 'ai' && ball.vel.z < 0) || (ch.team === 'p1' && ball.vel.z > 0);
+          if (ballGoingToTeam) {
+            if (state.isServeInFlight) {
+              if (ch.id === 'ai1') {
+                targetX = ball.pos.x;
+                targetZ = Math.max(-COURT_HALF_LEN - 1.5, Math.min(-SERVICE_LINE_Z + 0.5, ball.pos.z - 0.6));
+              }
+            } else if (state.mode === 'doubles') {
+              const myHalfSign = ch.baseX >= 0 ? 1 : -1;
+              const ballOnMySide = (ball.pos.x * myHalfSign) >= -0.4;
+              if (ballOnMySide) {
+                targetX = myHalfSign > 0
+                  ? Math.max(0.4, Math.min(DOUBLES_HALF_W + 0.8, ball.pos.x))
+                  : Math.min(-0.4, Math.max(-DOUBLES_HALF_W - 0.8, ball.pos.x));
+                targetZ = ch.team === 'ai'
+                  ? Math.max(-COURT_HALF_LEN - 1.5, Math.min(-2.2, ball.pos.z - 0.5))
+                  : Math.max(2.2, Math.min(COURT_HALF_LEN + 1.5, ball.pos.z + 0.5));
+              }
+            } else {
+              targetX = ball.pos.x;
+              targetZ = Math.max(-COURT_HALF_LEN - 1.5, Math.min(-2.0, ball.pos.z - 0.8));
+            }
+          }
+        }
+
+        const dx = targetX - ch.pos.x;
+        const dz = targetZ - ch.pos.z;
+        const dist = Math.hypot(dx, dz);
+        const spd = ch.role === 'partner' ? 8.0 : diffCfg.aiSpeed;
+
+        if (dist > 0.12) {
+          const step = Math.min(dist, spd * dt);
+          ch.pos.x += (dx / dist) * step;
+          ch.pos.z += (dz / dist) * step;
+          ch.velX = (dx / dist) * spd;
+          ch.velZ = (dz / dist) * spd;
+        } else {
+          ch.velX = 0;
+          ch.velZ = 0;
+        }
+
+        if (state.phase === 'rally' && ball.active && state.lastHitter !== ch.team) {
+          const canHitServe = !state.isServeInFlight || (ch.id === 'ai1' && state.bounceCountOnSide === 1);
+          if (canHitServe) {
+            const hitDist = Math.hypot(ball.pos.x - ch.pos.x, ball.pos.z - ch.pos.z);
+            if (hitDist < 1.65 && ball.pos.y < 2.6 && ball.pos.y > 0.15) {
+              state.isServeInFlight = false;
+              const aim = (Math.random() - 0.5) * 2 * diffCfg.aiReact;
+              const shot = Math.random() < 0.18 ? 'lob' : 'normal';
+              performHit(ch, ch.team, shot, aim);
+            }
+          }
+        }
+      });
+
+      const t = performance.now() * 0.012;
+      characters.forEach(ch => {
+        const speed = Math.hypot(ch.velX, ch.velZ);
+        if (speed > 0.4) {
+          ch.leftLeg.rotation.x = Math.sin(t) * 0.6;
+          ch.rightLeg.rotation.x = -Math.sin(t) * 0.6;
+        } else {
+          ch.leftLeg.rotation.x *= 0.85;
+          ch.rightLeg.rotation.x *= 0.85;
+        }
+
+        if (ch.swingTimer > 0) {
+          ch.swingTimer = Math.max(0, ch.swingTimer - dt);
+          const p = 1 - ch.swingTimer / (ch.swingDuration || 0.36);
+          const trailMat = ch.swingTrail.material;
+
+          if (ch.swingType === 'forehand') {
+            ch.root.rotation.y = ch.facing * (-0.5 + p * 1.1);
+            ch.root.rotation.x = 0;
+            ch.rightArm.rotation.x = -0.65 - Math.sin(p * Math.PI) * 0.65;
+            ch.rightArm.rotation.y = (0.95 - p * 2.1) * -ch.facing;
+            ch.rightArm.rotation.z = -0.4 + Math.sin(p * Math.PI) * 0.45;
+            ch.leftArm.rotation.x = -0.35;
+            ch.pos.y = 0;
+
+            trailMat.color.setHex(0xfacc15);
+            trailMat.opacity = Math.sin(p * Math.PI) * 0.65;
+            ch.swingTrail.position.set(0, 1.2, ch.facing * 0.45);
+            ch.swingTrail.rotation.set(Math.PI / 2, 0, (-0.8 + p * 1.8) * ch.facing);
+          } else if (ch.swingType === 'backhand') {
+            ch.root.rotation.y = ch.facing * (0.6 - p * 1.25);
+            ch.root.rotation.x = 0;
+            ch.rightArm.rotation.x = -0.75 - Math.sin(p * Math.PI) * 0.65;
+            ch.rightArm.rotation.y = (-1.1 + p * 2.2) * -ch.facing;
+            ch.rightArm.rotation.z = 0.35 - Math.sin(p * Math.PI) * 0.55;
+            ch.leftArm.rotation.x = -0.75;
+            ch.pos.y = 0;
+
+            trailMat.color.setHex(0x38bdf8);
+            trailMat.opacity = Math.sin(p * Math.PI) * 0.65;
+            ch.swingTrail.position.set(0, 1.2, ch.facing * 0.45);
+            ch.swingTrail.rotation.set(Math.PI / 2, 0, (0.8 - p * 1.8) * ch.facing);
+          } else if (ch.swingType === 'serve') {
+            ch.root.rotation.y = 0;
+            ch.root.rotation.x = Math.sin(p * Math.PI) * 0.14 * -ch.facing;
+            ch.leftArm.rotation.x = -Math.sin(Math.min(1, p * 1.5) * Math.PI) * 2.4 * -ch.facing;
+            ch.rightArm.rotation.x = (-2.7 + p * 3.3) * -ch.facing;
+            ch.rightArm.rotation.y = 0;
+            ch.rightArm.rotation.z = -0.22;
+            ch.pos.y = Math.sin(p * Math.PI) * 0.42;
+
+            trailMat.color.setHex(0xfde047);
+            trailMat.opacity = p > 0.25 ? Math.sin(((p - 0.25) / 0.75) * Math.PI) * 0.7 : 0;
+            ch.swingTrail.position.set(0.32, 1.85, ch.facing * 0.3);
+            ch.swingTrail.rotation.set(0, Math.PI / 2, (-1.2 + p * 2.2) * ch.facing);
+          } else if (ch.swingType === 'smash') {
+            ch.root.rotation.y = 0;
+            ch.root.rotation.x = Math.sin(p * Math.PI) * 0.2 * -ch.facing;
+            ch.leftArm.rotation.x = -0.6 * -ch.facing;
+            ch.rightArm.rotation.x = (-2.9 + p * 3.6) * -ch.facing;
+            ch.rightArm.rotation.y = 0;
+            ch.rightArm.rotation.z = -0.18;
+            ch.pos.y = Math.sin(p * Math.PI) * 0.75;
+
+            trailMat.color.setHex(0xf97316);
+            trailMat.opacity = Math.sin(p * Math.PI) * 0.8;
+            ch.swingTrail.position.set(0.28, 2.0, ch.facing * 0.35);
+            ch.swingTrail.rotation.set(0, Math.PI / 2, (-1.1 + p * 2.4) * ch.facing);
+          }
+        } else {
+          ch.pos.y *= 0.75;
+          ch.root.rotation.y *= 0.82;
+          ch.root.rotation.x *= 0.82;
+          ch.rightArm.rotation.x += (-0.52 * -ch.facing - ch.rightArm.rotation.x) * 0.2;
+          ch.rightArm.rotation.y *= 0.82;
+          ch.rightArm.rotation.z += (-0.32 - ch.rightArm.rotation.z) * 0.2;
+          if (speed > 0.4) {
+            ch.leftArm.rotation.x = -Math.sin(t) * 0.4;
+          } else {
+            ch.leftArm.rotation.x += (-0.35 * -ch.facing - ch.leftArm.rotation.x) * 0.2;
+          }
+          ch.swingTrail.material.opacity = 0;
+        }
+      });
+
+      if (ball.active && state.phase === 'rally') {
+        const prevZ = ball.pos.z;
+        ball.vel.y += GRAVITY * dt;
+        ball.pos.addScaledVector(ball.vel, dt);
+
+        if ((prevZ > 0 && ball.pos.z <= 0) || (prevZ < 0 && ball.pos.z >= 0)) {
+          if (ball.pos.y < NET_HEIGHT + 0.08 && Math.abs(ball.pos.x) <= DOUBLES_HALF_W + 0.4) {
+            playSound('net');
+            ball.vel.z *= -0.3;
+            ball.vel.x *= 0.4;
+            ball.vel.y = 1.2;
+            if (state.isServeInFlight) {
+              handleServeFault('發球觸網');
+            } else {
+              const winner = state.lastHitter === 'p1' ? 'ai' : 'p1';
+              awardPoint(winner, '觸網 NET');
+            }
+          }
+        }
+
+        if (ball.pos.y <= 0.18 && ball.vel.y < 0) {
+          ball.pos.y = 0.18;
+          const cCfg = COURTS[state.courtKey];
+          ball.vel.y = Math.abs(ball.vel.y) * cCfg.restitution;
+          ball.vel.x *= cCfg.speedKeep;
+          ball.vel.z *= cCfg.speedKeep;
+          playSound('bounce');
+          spawnParticles(ball.pos.x, ball.pos.z, cCfg.particleColor);
+
+          if (state.bounceCountOnSide === 0) {
+            if (state.isServeInFlight) {
+              const box = getDiagonalServiceBoxBounds(state.lastHitter, state.serveSide);
+              const inServiceBox =
+                ball.pos.x >= box.minX - 0.12 &&
+                ball.pos.x <= box.maxX + 0.12 &&
+                ball.pos.z >= box.minZ - 0.12 &&
+                ball.pos.z <= box.maxZ + 0.12;
+              if (!inServiceBox) {
+                handleServeFault('發球出界');
+              } else {
+                state.bounceCountOnSide = 1;
+                state.firstBounceValid = true;
+                state.serveFaults = 0;
+              }
+            } else {
+              const hw = getCourtHalfWidth();
+              const inBounds = Math.abs(ball.pos.x) <= hw + 0.12 && Math.abs(ball.pos.z) <= COURT_HALF_LEN + 0.12;
+              const bouncedOnOpponentSide =
+                (state.lastHitter === 'p1' && ball.pos.z < 0) ||
+                (state.lastHitter === 'ai' && ball.pos.z > 0);
+              if (!inBounds || !bouncedOnOpponentSide) {
+                const winner = state.lastHitter === 'p1' ? 'ai' : 'p1';
+                awardPoint(winner, '出界 OUT');
+              } else {
+                state.bounceCountOnSide = 1;
+                state.firstBounceValid = true;
+              }
+            }
+          } else {
+            awardPoint(state.lastHitter, '兩跳得分 WINNER');
+          }
+        }
+
+        if (ball.vel.y !== 0) {
+          const disc = ball.vel.y * ball.vel.y - 2 * GRAVITY * (ball.pos.y - 0.18);
+          if (disc >= 0) {
+            const tLand = (-ball.vel.y - Math.sqrt(disc)) / GRAVITY;
+            if (tLand > 0 && tLand < 1.8) {
+              targetRingMesh.visible = true;
+              targetRingMesh.position.set(
+                ball.pos.x + ball.vel.x * tLand,
+                0.025,
+                ball.pos.z + ball.vel.z * tLand
+              );
+            } else {
+              targetRingMesh.visible = false;
+            }
+          }
+        }
+      }
+
+      ballMesh.position.copy(ball.pos);
+      ballShadowMesh.position.set(ball.pos.x, 0.02, ball.pos.z);
+      const shScale = Math.max(0.4, 1 - ball.pos.y * 0.1);
+      ballShadowMesh.scale.set(shScale, shScale, 1);
+
+      if (userChar) {
+        const narrowPull = camera.aspect < 1.2 ? (1.2 - camera.aspect) : 0;
+        const targetCamX = userChar.pos.x * 0.35;
+        const targetCamY = 9.8 + narrowPull * 2.4;
+        const targetCamZ = 21.8 + narrowPull * 6.8 + (userChar.pos.z - 11.2) * 0.48;
+        camera.position.x += (targetCamX - camera.position.x) * 4.5 * dt;
+        camera.position.y += (targetCamY - camera.position.y) * 4.5 * dt;
+        camera.position.z += (targetCamZ - camera.position.z) * 4.5 * dt;
+        camera.lookAt(userChar.pos.x * 0.22, 0.85, 1.6);
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      update(dt);
+      renderer.render(scene, camera);
+    }
+
+    // =========================================================================
+    // 8. UI EVENT WIRING & INITIALIZATION
+    // =========================================================================
+    function wireUI() {
+      function setupGroup(selector, stateKey, attr) {
+        const btns = document.querySelectorAll(selector);
+        btns.forEach(btn => {
+          btn.addEventListener('click', () => {
+            btns.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            state[stateKey] = attr === 'data-games' ? parseInt(btn.getAttribute(attr), 10) : btn.getAttribute(attr);
+          });
+        });
+      }
+
+      setupGroup('.mode-btn', 'mode', 'data-mode');
+      setupGroup('.gender-btn', 'gender', 'data-gender');
+      setupGroup('.court-card', 'courtKey', 'data-court');
+      setupGroup('.diff-btn', 'difficulty', 'data-diff');
+      setupGroup('.games-btn', 'targetGames', 'data-games');
+
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      state.showTouch = isTouchDevice;
+
+      function syncControlHints() {
+        document.getElementById('touch-controls').classList.toggle('hidden', !state.showTouch || !state.running);
+        document.getElementById('desktop-hint').classList.toggle('hidden', state.showTouch || !state.running);
+      }
+
+      document.getElementById('btn-start-match').addEventListener('click', () => {
+        ensureAudio();
+        startNewMatch();
+        syncControlHints();
+      });
+
+      document.getElementById('btn-toggle-touch').addEventListener('click', () => {
+        state.showTouch = !state.showTouch;
+        syncControlHints();
+      });
+
+      document.getElementById('btn-mute').addEventListener('click', () => {
+        state.muted = !state.muted;
+        document.getElementById('mute-icon').textContent = state.muted ? '🔇' : '🔊';
+      });
+
+      document.getElementById('btn-pause').addEventListener('click', togglePause);
+      document.getElementById('btn-resume').addEventListener('click', togglePause);
+
+      document.getElementById('btn-restart-same').addEventListener('click', () => {
+        document.getElementById('pause-modal').classList.add('hidden');
+        startNewMatch();
+        syncControlHints();
+      });
+
+      document.getElementById('btn-back-setup').addEventListener('click', () => {
+        state.running = false;
+        state.paused = false;
+        document.getElementById('pause-modal').classList.add('hidden');
+        document.getElementById('hud-top').classList.add('hidden');
+        document.getElementById('serve-hint').classList.add('hidden');
+        document.getElementById('setup-modal').classList.remove('hidden');
+        syncControlHints();
+      });
+    }
+
+    function togglePause() {
+      if (!state.running || state.matchOver) return;
+      state.paused = !state.paused;
+      const modal = document.getElementById('pause-modal');
+      if (state.paused) {
+        document.getElementById('pause-emoji').textContent = '⏸️';
+        document.getElementById('pause-title').textContent = '比賽暫停';
+        document.getElementById('pause-subtitle').textContent = '隨時調整設定或繼續比賽';
+        document.getElementById('btn-resume').classList.remove('hidden');
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function startNewMatch() {
+      state.p1Games = 0;
+      state.aiGames = 0;
+      state.p1Points = 0;
+      state.aiPoints = 0;
+      state.server = 'p1';
+      state.matchOver = false;
+      state.paused = false;
+      state.running = true;
+
+      buildCourt(state.courtKey);
+      buildCharacters();
+      updateScoreHUD();
+
+      document.getElementById('setup-modal').classList.add('hidden');
+      document.getElementById('pause-modal').classList.add('hidden');
+      document.getElementById('hud-top').classList.remove('hidden');
+
+      setupNextPoint();
+      showCallout(COURTS[state.courtKey].name, state.mode === 'singles' ? '單打對決開始！' : '雙打對決開始！', 1600);
+    }
+
+    window.onload = function () {
+      initThree();
+      wireUI();
+      animate();
+    };
+  </script>
+</body>
+</html>
