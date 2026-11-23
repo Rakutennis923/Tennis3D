@@ -383,10 +383,13 @@
         name: '溫網 WIMBLEDON',
         badge: '🇬🇧 草地球場 • 倫敦',
         landmarks: '島上地標：白金漢宮 + 英國衛兵',
-        desc: '全英草地俱樂部草地球場，球彈跳低平快速！依溫網傳統，所有選手一律穿著全白上衣與白色褲／裙。',
+        desc: '全英草地俱樂部草地球場，縱向雙色草皮、深綠圍牆與經典木質球網柱！依溫網傳統，所有選手一律穿著全白上衣與白色褲／裙。',
         surface: 'grass',
-        innerColor: '#1f7a3f',
-        outerColor: '#14532d',
+        innerColor: '#5c8d24',
+        outerColor: '#4c7a1d',
+        wallColor: '#233322',
+        seatColor: '#1e4620',
+        woodPosts: true,
         lineColor: '#ffffff',
         skyColor: 0x93c5fd,
         fogColor: 0xdbeafe,
@@ -425,10 +428,12 @@
         name: '台灣・台北公開賽',
         badge: '🇹🇼 綠底藍場 • 台灣',
         landmarks: '島上地標：台北101大樓 + 珍珠奶茶',
-        desc: '位於群島中央的美麗寶島！綠底配藍色硬地球場，選手穿著熱血紅色上衣搭配深藍色球褲／網球裙出賽。',
+        desc: '位於群島中央的美麗寶島！經典綠底配正藍色硬地球場，底線地上印有白色 TAIWAN 字樣，選手穿著紅色上衣搭配深藍色球褲／網球裙出賽。',
         surface: 'hard',
         innerColor: '#2563eb',
         outerColor: '#15803d',
+        wallColor: '#166534',
+        seatColor: '#1e293b',
         lineColor: '#ffffff',
         skyColor: 0x38bdf8,
         fogColor: 0xbae6fd,
@@ -540,22 +545,78 @@
         osc.start(now);
         osc.stop(now + 0.07);
       } else if (type === 'point_win') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(523.25, now);
-        osc.frequency.setValueAtTime(659.25, now + 0.09);
-        osc.frequency.setValueAtTime(783.99, now + 0.18);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
-        osc.start(now);
-        osc.stop(now + 0.37);
+        const melodies = [
+          [523.25, 659.25, 783.99],
+          [587.33, 739.99, 880.00],
+          [523.25, 659.25, 1046.50],
+          [659.25, 783.99, 987.77]
+        ];
+        const notes = melodies[Math.floor(Math.random() * melodies.length)];
+        notes.forEach((freq, i) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = 'triangle';
+          o.frequency.setValueAtTime(freq, now + i * 0.08);
+          g.gain.setValueAtTime(0.18, now + i * 0.08);
+          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.22);
+          o.connect(g); g.connect(audioCtx.destination);
+          o.start(now + i * 0.08); o.stop(now + i * 0.08 + 0.23);
+        });
+      } else if (type === 'game_win') {
+        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        notes.forEach((freq, i) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = i === notes.length - 1 ? 'sine' : 'triangle';
+          o.frequency.setValueAtTime(freq, now + i * 0.085);
+          g.gain.setValueAtTime(0.22, now + i * 0.085);
+          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.085 + 0.35);
+          o.connect(g); g.connect(audioCtx.destination);
+          o.start(now + i * 0.085); o.stop(now + i * 0.085 + 0.36);
+        });
+      } else if (type === 'match_win') {
+        const fanfare = [
+          [523.25, 0.0, 0.14], [659.25, 0.12, 0.14], [783.99, 0.24, 0.16],
+          [1046.50, 0.38, 0.45], [783.99, 0.56, 0.15], [1046.50, 0.72, 0.65]
+        ];
+        fanfare.forEach(([freq, tOff, dur]) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = 'triangle';
+          o.frequency.setValueAtTime(freq, now + tOff);
+          g.gain.setValueAtTime(0.24, now + tOff);
+          g.gain.exponentialRampToValueAtTime(0.001, now + tOff + dur);
+          o.connect(g); g.connect(audioCtx.destination);
+          o.start(now + tOff); o.stop(now + tOff + dur + 0.02);
+        });
+        // Synthesized stadium crowd applause swell
+        const bufSize = audioCtx.sampleRate * 1.1;
+        const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.4;
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buf;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1100;
+        const ng = audioCtx.createGain();
+        ng.gain.setValueAtTime(0.01, now);
+        ng.gain.linearRampToValueAtTime(0.16, now + 0.25);
+        ng.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+        noise.connect(filter); filter.connect(ng); ng.connect(audioCtx.destination);
+        noise.start(now); noise.stop(now + 1.1);
       } else if (type === 'point_lose') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(220, now);
-        osc.frequency.linearRampToValueAtTime(140, now + 0.22);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
-        osc.start(now);
-        osc.stop(now + 0.25);
+        const loseNotes = Math.random() < 0.5 ? [246.94, 196.00] : [220.00, 164.81];
+        loseNotes.forEach((freq, i) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = 'sawtooth';
+          o.frequency.setValueAtTime(freq, now + i * 0.1);
+          g.gain.setValueAtTime(0.10, now + i * 0.1);
+          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.18);
+          o.connect(g); g.connect(audioCtx.destination);
+          o.start(now + i * 0.1); o.stop(now + i * 0.1 + 0.19);
+        });
       } else if (type === 'net') {
         osc.type = 'square';
         osc.frequency.setValueAtTime(110, now);
@@ -1295,10 +1356,11 @@
       ctx.fillStyle = isInner ? cfg.innerColor : cfg.outerColor;
       ctx.fillRect(0, 0, 512, 512);
 
-      if (cfg.hasGrassStripes && isInner) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+      if (cfg.hasGrassStripes) {
+        // Authentic Wimbledon vertical mowed stripes across the grass
+        ctx.fillStyle = isInner ? 'rgba(255, 255, 255, 0.09)' : 'rgba(0, 0, 0, 0.08)';
         for (let i = 0; i < 16; i += 2) {
-          ctx.fillRect(0, i * 32, 512, 32);
+          ctx.fillRect(i * 32, 0, 32, 512);
         }
       }
       if (cfg.hasClayGrain) {
@@ -1356,8 +1418,37 @@
       addLine(lw, 0.25, 0, COURT_HALF_LEN - 0.125);
       addLine(lw, 0.25, 0, -COURT_HALF_LEN + 0.125);
 
+      if (cfg.isTaiwanShape) {
+        const tc = document.createElement('canvas');
+        tc.width = 1024;
+        tc.height = 256;
+        const tctx = tc.getContext('2d');
+        tctx.clearRect(0, 0, 1024, 256);
+        tctx.fillStyle = '#ffffff';
+        tctx.font = '900 165px Inter, Arial, sans-serif';
+        tctx.textAlign = 'center';
+        tctx.textBaseline = 'middle';
+        tctx.fillText('TAIWAN', 512, 128);
+        const tTex = new THREE.CanvasTexture(tc);
+        const tMat = new THREE.MeshBasicMaterial({ map: tTex, transparent: true, opacity: 0.95 });
+        const tGeo = new THREE.PlaneGeometry(10.5, 2.6);
+        tGeo.rotateX(-Math.PI / 2);
+
+        const nearLabel = new THREE.Mesh(tGeo, tMat);
+        nearLabel.position.set(0, 0.015, COURT_HALF_LEN + 2.6);
+        courtGroup.add(nearLabel);
+
+        const farLabel = new THREE.Mesh(tGeo, tMat);
+        farLabel.rotation.y = Math.PI;
+        farLabel.position.set(0, 0.015, -COURT_HALF_LEN - 2.6);
+        courtGroup.add(farLabel);
+      }
+
       const postGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.12, 12);
-      const postMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+      const postMat = new THREE.MeshStandardMaterial({
+        color: cfg.woodPosts ? 0xa88a4d : 0x1e293b,
+        roughness: cfg.woodPosts ? 0.55 : 0.4
+      });
       [-DOUBLES_HALF_W - 0.4, DOUBLES_HALF_W + 0.4].forEach(px => {
         const post = new THREE.Mesh(postGeo, postMat);
         post.position.set(px, 0.56, 0);
@@ -1379,43 +1470,97 @@
       tapeMesh.position.set(0, NET_HEIGHT, 0);
       courtGroup.add(tapeMesh);
 
-      const wallMat = new THREE.MeshStandardMaterial({ color: cfg.outerColor, roughness: 0.7 });
-      const backWallGeo = new THREE.BoxGeometry(24, 1.3, 0.4);
+      const wallMat = new THREE.MeshStandardMaterial({ color: cfg.wallColor || cfg.outerColor, roughness: 0.72 });
+      const backWallGeo = new THREE.BoxGeometry(24, 1.45, 0.45);
       [-19, 19].forEach(wz => {
         const wall = new THREE.Mesh(backWallGeo, wallMat);
-        wall.position.set(0, 0.65, wz);
+        wall.position.set(0, 0.72, wz);
         wall.receiveShadow = true;
         courtGroup.add(wall);
       });
-      const sideWallGeo = new THREE.BoxGeometry(0.4, 1.3, 38);
+      const sideWallGeo = new THREE.BoxGeometry(0.45, 1.45, 38);
       [-12, 12].forEach(wx => {
         const wall = new THREE.Mesh(sideWallGeo, wallMat);
-        wall.position.set(wx, 0.65, 0);
+        wall.position.set(wx, 0.72, 0);
         courtGroup.add(wall);
       });
 
-      const standMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 });
-      const crowdColors = [0xfef08a, 0x38bdf8, 0xfb7185, 0x4ade80, 0xffffff, 0xc084fc];
-      function addBleacher(x, y, z, w, h, d, countX, countZ) {
-        const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), standMat);
-        b.position.set(x, y, z);
-        courtGroup.add(b);
-        const specGeo = new THREE.SphereGeometry(0.24, 8, 8);
-        for (let i = 0; i < countX; i++) {
-          for (let j = 0; j < countZ; j++) {
-            if ((i + j) % 2 === 0) continue;
-            const c = crowdColors[(i * 7 + j * 3) % crowdColors.length];
-            const sm = new THREE.Mesh(specGeo, new THREE.MeshStandardMaterial({ color: c }));
-            const sx = x - w / 2 + ((i + 0.5) / countX) * w;
-            const sz = z - d / 2 + ((j + 0.5) / countZ) * d;
-            sm.position.set(sx, y + h / 2 + 0.22, sz);
-            courtGroup.add(sm);
+      // Realistic Multi-Tiered Stadium Bleachers with Individual Seats & Dense Lively Crowd
+      const concreteMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.88 });
+      const seatMat = new THREE.MeshStandardMaterial({ color: cfg.seatColor || 0x1e293b, roughness: 0.65 });
+      const crowdShirtColors = [0xfef08a, 0x38bdf8, 0xfb7185, 0x4ade80, 0xffffff, 0xc084fc, 0xf97316, 0x93c5fd];
+      const skinTones = [0xfcd5b5, 0xf5cba7, 0xe0ac69, 0xfde2c8];
+      const seatGeo = new THREE.BoxGeometry(0.55, 0.36, 0.45);
+      const torsoGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.42, 8);
+      const headGeo = new THREE.SphereGeometry(0.15, 8, 8);
+
+      function addSideStand(sideSign) {
+        const tiers = 4;
+        const rowsPerStand = 22;
+        for (let t = 0; t < tiers; t++) {
+          const tierX = sideSign * (13.4 + t * 1.15);
+          const tierY = 0.7 + t * 0.75;
+          const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(1.15, tierY * 2, 34), concreteMat);
+          stepMesh.position.set(tierX, tierY / 2, 0);
+          stepMesh.receiveShadow = true;
+          courtGroup.add(stepMesh);
+
+          for (let r = 0; r < rowsPerStand; r++) {
+            if (r === 7 || r === 14) continue; // Stair aisle gaps
+            const sz = -16.2 + r * 1.52;
+            const seat = new THREE.Mesh(seatGeo, seatMat);
+            seat.rotation.y = Math.PI / 2;
+            seat.position.set(tierX, tierY + 0.18, sz);
+            courtGroup.add(seat);
+
+            // ~85% seat occupancy for realistic packed stadium
+            if ((t * 13 + r * 7) % 9 !== 0) {
+              const shirtCol = crowdShirtColors[(t * 5 + r * 3) % crowdShirtColors.length];
+              const skinCol = skinTones[(t + r) % skinTones.length];
+              const torso = new THREE.Mesh(torsoGeo, new THREE.MeshStandardMaterial({ color: shirtCol }));
+              torso.position.set(tierX - sideSign * 0.08, tierY + 0.38, sz);
+              const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({ color: skinCol }));
+              head.position.set(tierX - sideSign * 0.08, tierY + 0.70, sz);
+              courtGroup.add(torso, head);
+            }
           }
         }
       }
-      addBleacher(-14.5, 1.2, 0, 4.2, 2.4, 34, 2, 18);
-      addBleacher(14.5, 1.2, 0, 4.2, 2.4, 34, 2, 18);
-      addBleacher(0, 1.4, -21.5, 24, 2.8, 4.5, 14, 2);
+
+      function addBackStand() {
+        const tiers = 4;
+        const cols = 16;
+        for (let t = 0; t < tiers; t++) {
+          const tierZ = -20.4 - t * 1.15;
+          const tierY = 0.75 + t * 0.78;
+          const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(24, tierY * 2, 1.15), concreteMat);
+          stepMesh.position.set(0, tierY / 2, tierZ);
+          stepMesh.receiveShadow = true;
+          courtGroup.add(stepMesh);
+
+          for (let c = 0; c < cols; c++) {
+            if (c === 5 || c === 10) continue; // Aisles
+            const sx = -11.2 + c * 1.48;
+            const seat = new THREE.Mesh(seatGeo, seatMat);
+            seat.position.set(sx, tierY + 0.18, tierZ);
+            courtGroup.add(seat);
+
+            if ((t * 11 + c * 5) % 8 !== 0) {
+              const shirtCol = crowdShirtColors[(t * 3 + c * 7) % crowdShirtColors.length];
+              const skinCol = skinTones[(t + c) % skinTones.length];
+              const torso = new THREE.Mesh(torsoGeo, new THREE.MeshStandardMaterial({ color: shirtCol }));
+              torso.position.set(sx, tierY + 0.38, tierZ + 0.08);
+              const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({ color: skinCol }));
+              head.position.set(sx, tierY + 0.70, tierZ + 0.08);
+              courtGroup.add(torso, head);
+            }
+          }
+        }
+      }
+
+      addSideStand(-1);
+      addSideStand(1);
+      addBackStand();
 
       scene.add(courtGroup);
     }
@@ -2203,10 +2348,12 @@
         if (state.p1Games >= state.targetGames || state.aiGames >= state.targetGames) {
           state.matchOver = true;
           const youWin = state.p1Games > state.aiGames;
+          if (youWin) playSound('match_win');
           showCallout(youWin ? '🏆 比賽勝利！' : '比賽結束', `${state.p1Games} : ${state.aiGames}`, 3000);
           setTimeout(() => showMatchEndModal(youWin), 1400);
           return;
         } else {
+          if (gameWonBy === 'p1') playSound('game_win');
           showCallout(gameWonBy === 'p1' ? 'GAME! 你拿下這局' : 'GAME! 對手拿下這局', `局數 ${state.p1Games} - ${state.aiGames}`);
         }
       } else {
