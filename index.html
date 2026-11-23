@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>大滿貫 3D 卡通網球公開賽 | Grand Slam 3D Tennis</title>
+  <title>大滿貫 3D 群島世界地圖 & 卡通網球公開賽</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
@@ -22,17 +22,13 @@
       overflow: hidden;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: #0f172a;
-      touch-action: manipulation;
-      -webkit-text-size-adjust: 100%;
-      overscroll-behavior: none;
+      touch-action: none;
     }
     #game-container {
-      position: fixed;
-      inset: 0;
+      position: relative;
       width: 100vw;
       height: 100dvh;
       overflow: hidden;
-      touch-action: none;
     }
     #three-canvas {
       display: block;
@@ -43,17 +39,14 @@
       background: rgba(15, 23, 42, 0.78);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.16);
     }
-    .court-card {
-      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-    }
-    .court-card:hover {
-      transform: translateY(-2px);
-    }
-    .court-card.selected {
-      border-color: #facc15;
-      box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.45), 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    .warm-glass {
+      background: rgba(255, 251, 242, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      color: #1e293b;
     }
     .option-btn {
       transition: all 0.15s ease;
@@ -62,8 +55,17 @@
       background: linear-gradient(135deg, #facc15, #f59e0b);
       color: #0f172a;
       font-weight: 800;
+      border-color: #f59e0b;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+    }
+    .island-nav-btn {
+      transition: all 0.18s ease;
+    }
+    .island-nav-btn.active {
+      background: linear-gradient(135deg, #facc15, #f59e0b);
+      color: #0f172a;
       border-color: #fde047;
-      box-shadow: 0 4px 14px rgba(250, 204, 21, 0.35);
+      transform: translateX(3px);
     }
     @keyframes popIn {
       0% { transform: scale(0.7); opacity: 0; }
@@ -73,7 +75,6 @@
     .callout-anim {
       animation: popIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
     }
-    /* Virtual Joystick */
     #joystick-zone {
       position: relative;
       width: 124px;
@@ -104,47 +105,132 @@
       transform: scale(0.91);
       filter: brightness(1.15);
     }
-    /* Mobile Landscape compact HUD so center court stays completely clear */
-    @media (orientation: landscape) and (max-height: 520px) {
-      #callout-banner {
-        top: 8px !important;
-        max-width: 44vw !important;
-      }
-      #callout-box {
-        padding: 2px 10px !important;
-        border-radius: 9999px !important;
-      }
-      #callout-title {
-        font-size: 12px !important;
-      }
-      #callout-sub {
-        font-size: 10px !important;
-      }
-      #serve-hint {
-        bottom: 6px !important;
-      }
-      #serve-hint > div {
-        padding: 2px 10px !important;
-        font-size: 10px !important;
-      }
-      #joystick-zone {
-        width: 96px !important;
-        height: 96px !important;
-      }
-      #joystick-knob {
-        width: 40px !important;
-        height: 40px !important;
-      }
-    }
   </style>
 </head>
 <body>
   <div id="game-container">
     <canvas id="three-canvas"></canvas>
 
-    <!-- Top Scoreboard & Controls HUD -->
+    <!-- =================================================================== -->
+    <!-- ARCHIPELAGO 3D WORLD MAP UI OVERLAY                                 -->
+    <!-- =================================================================== -->
+    <div id="map-ui" class="absolute inset-0 z-20 pointer-events-none">
+      <!-- Top Title Banner -->
+      <div class="p-3 sm:p-5 flex items-start justify-between gap-2">
+        <div class="warm-glass rounded-2xl px-3.5 py-2 sm:px-5 sm:py-3 shadow-xl pointer-events-auto max-w-[72vw] sm:max-w-md">
+          <div class="flex items-center gap-2">
+            <span class="text-xl sm:text-2xl">🏝️</span>
+            <div>
+              <h1 class="text-sm sm:text-lg font-black text-slate-900 leading-tight">大滿貫 3D 群島世界地圖</h1>
+              <p class="text-[11px] sm:text-xs text-slate-600 font-medium">拖曳旋轉、滾輪縮放，點擊小島即可查看資訊並開賽</p>
+            </div>
+          </div>
+        </div>
+
+        <button id="btn-map-overview" class="warm-glass hover:bg-amber-100 rounded-xl px-3 py-2 text-xs sm:text-sm font-extrabold shadow-lg pointer-events-auto flex items-center gap-1.5">
+          <span>🗺️</span>
+          <span>群島全覽</span>
+        </button>
+      </div>
+
+      <!-- Left Quick-Switch Sidebar -->
+      <div id="map-sidebar" class="absolute left-3 sm:left-5 top-20 sm:top-24 flex flex-col gap-1.5 sm:gap-2 pointer-events-auto">
+        <button type="button" data-island="usopen" class="island-nav-btn warm-glass rounded-xl px-2.5 py-2 sm:px-3.5 sm:py-2.5 text-left shadow-lg flex items-center gap-2 text-xs sm:text-sm font-bold">
+          <span class="text-base sm:text-lg">🗽</span>
+          <div>
+            <div class="leading-tight">美國・美網</div>
+            <div class="text-[10px] opacity-75 hidden sm:block">硬地 • 自由女神</div>
+          </div>
+        </button>
+        <button type="button" data-island="frenchopen" class="island-nav-btn warm-glass rounded-xl px-2.5 py-2 sm:px-3.5 sm:py-2.5 text-left shadow-lg flex items-center gap-2 text-xs sm:text-sm font-bold">
+          <span class="text-base sm:text-lg">🗼</span>
+          <div>
+            <div class="leading-tight">法國・法網</div>
+            <div class="text-[10px] opacity-75 hidden sm:block">紅土 • 艾菲爾鐵塔</div>
+          </div>
+        </button>
+        <button type="button" data-island="wimbledon" class="island-nav-btn warm-glass rounded-xl px-2.5 py-2 sm:px-3.5 sm:py-2.5 text-left shadow-lg flex items-center gap-2 text-xs sm:text-sm font-bold">
+          <span class="text-base sm:text-lg">🏰</span>
+          <div>
+            <div class="leading-tight">英國・溫網</div>
+            <div class="text-[10px] opacity-75 hidden sm:block">草地 • 全白服裝規定</div>
+          </div>
+        </button>
+        <button type="button" data-island="ausopen" class="island-nav-btn warm-glass rounded-xl px-2.5 py-2 sm:px-3.5 sm:py-2.5 text-left shadow-lg flex items-center gap-2 text-xs sm:text-sm font-bold">
+          <span class="text-base sm:text-lg">🦘</span>
+          <div>
+            <div class="leading-tight">澳洲・澳網</div>
+            <div class="text-[10px] opacity-75 hidden sm:block">晴空硬地 • 歌劇院</div>
+          </div>
+        </button>
+      </div>
+
+      <!-- Right / Bottom Island Detail & Match Setup Panel -->
+      <div id="island-detail-panel" class="hidden absolute bottom-3 left-3 right-3 sm:left-auto sm:right-5 sm:top-24 sm:bottom-auto sm:w-80 warm-glass rounded-3xl p-4 sm:p-5 shadow-2xl pointer-events-auto max-h-[68dvh] sm:max-h-[80dvh] overflow-y-auto">
+        <div class="flex items-start justify-between gap-2 mb-2.5">
+          <div>
+            <div id="detail-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/30 text-amber-900 text-[11px] font-extrabold mb-1">
+              🇺🇸 硬地球場
+            </div>
+            <h2 id="detail-title" class="text-lg sm:text-xl font-black text-slate-900 leading-tight">美網 US OPEN</h2>
+            <p id="detail-landmarks" class="text-[11px] text-slate-600 font-semibold mt-0.5">島上地標：自由女神像 + 麥當勞</p>
+          </div>
+          <button id="btn-close-detail" class="w-7 h-7 rounded-full bg-slate-900/10 hover:bg-slate-900/20 flex items-center justify-center text-slate-700 font-bold text-sm">✕</button>
+        </div>
+
+        <p id="detail-desc" class="text-xs text-slate-700 leading-relaxed mb-3 bg-white/60 rounded-xl p-2.5 border border-amber-200/70">
+          彈性均衡、球速明快的硬地球場。選手穿著正式網球套裝出賽。
+        </p>
+
+        <!-- Match Options inside Island Panel -->
+        <div class="space-y-2.5 mb-3.5">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase text-slate-500 mb-1">賽制</label>
+              <div class="grid grid-cols-2 gap-1">
+                <button type="button" data-mode="singles" class="mode-btn option-btn selected rounded-lg border border-slate-300 bg-white/80 py-1.5 text-xs font-bold">單打</button>
+                <button type="button" data-mode="doubles" class="mode-btn option-btn rounded-lg border border-slate-300 bg-white/80 py-1.5 text-xs font-bold">雙打</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase text-slate-500 mb-1">選手性別</label>
+              <div class="grid grid-cols-2 gap-1">
+                <button type="button" data-gender="male" class="gender-btn option-btn selected rounded-lg border border-slate-300 bg-white/80 py-1.5 text-xs font-bold">👦 男</button>
+                <button type="button" data-gender="female" class="gender-btn option-btn rounded-lg border border-slate-300 bg-white/80 py-1.5 text-xs font-bold">👧 女</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase text-slate-500 mb-1">難度</label>
+              <div class="grid grid-cols-3 gap-1">
+                <button type="button" data-diff="easy" class="diff-btn option-btn rounded-lg border border-slate-300 bg-white/80 py-1 text-[11px] font-bold">輕</button>
+                <button type="button" data-diff="normal" class="diff-btn option-btn selected rounded-lg border border-slate-300 bg-white/80 py-1 text-[11px] font-bold">中</button>
+                <button type="button" data-diff="hard" class="diff-btn option-btn rounded-lg border border-slate-300 bg-white/80 py-1 text-[11px] font-bold">難</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] font-extrabold uppercase text-slate-500 mb-1">搶局數</label>
+              <div class="grid grid-cols-3 gap-1">
+                <button type="button" data-games="2" class="games-btn option-btn rounded-lg border border-slate-300 bg-white/80 py-1 text-[11px] font-bold">2局</button>
+                <button type="button" data-games="3" class="games-btn option-btn selected rounded-lg border border-slate-300 bg-white/80 py-1 text-[11px] font-bold">3局</button>
+                <button type="button" data-games="6" class="games-btn option-btn rounded-lg border border-slate-300 bg-white/80 py-1 text-[11px] font-bold">6局</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button id="btn-start-match" class="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400 hover:brightness-105 text-slate-950 font-black text-sm sm:text-base shadow-lg transition active:scale-[0.98]">
+          🎾 前往此球場比賽！
+        </button>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- IN-MATCH HUD OVERLAY                                                -->
+    <!-- =================================================================== -->
     <div id="hud-top" class="hidden absolute top-0 left-0 right-0 z-20 p-2 sm:p-4 flex items-start justify-between pointer-events-none gap-2">
-      <!-- Scoreboard -->
       <div class="glass-panel rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 text-white shadow-xl pointer-events-auto flex items-center gap-3 sm:gap-5">
         <div class="flex flex-col">
           <div class="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300">
@@ -153,7 +239,6 @@
             <span id="hud-mode-badge">單打</span>
           </div>
           <div class="mt-1 grid grid-cols-[1fr_auto_auto] gap-x-3 sm:gap-x-4 gap-y-0.5 items-center text-xs sm:text-sm">
-            <!-- Player Row -->
             <div class="flex items-center gap-1.5 font-bold text-sky-300">
               <span id="serve-dot-p1" class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
               <span>你 (YOU)</span>
@@ -161,7 +246,6 @@
             <div class="text-center font-extrabold text-white/90 w-6" id="score-games-p1">0</div>
             <div class="text-center font-black text-amber-300 bg-white/10 rounded px-1.5 py-0.5 min-w-[34px]" id="score-pts-p1">0</div>
 
-            <!-- AI Row -->
             <div class="flex items-center gap-1.5 font-bold text-rose-300">
               <span id="serve-dot-ai" class="w-2 h-2 rounded-full bg-amber-400 opacity-0 inline-block"></span>
               <span>對手 (CPU)</span>
@@ -172,7 +256,6 @@
         </div>
       </div>
 
-      <!-- Right Utility Buttons -->
       <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
         <button id="btn-toggle-touch" title="切換觸控按鍵" class="glass-panel hover:bg-white/15 text-white rounded-xl px-2.5 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-lg">
           <span>🎮</span>
@@ -181,17 +264,17 @@
         <button id="btn-mute" title="音效開關" class="glass-panel hover:bg-white/15 text-white rounded-xl px-2.5 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1 shadow-lg">
           <span id="mute-icon">🔊</span>
         </button>
-        <button id="btn-pause" title="暫停 / 設定" class="glass-panel hover:bg-white/15 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-bold shadow-lg">
+        <button id="btn-pause" title="暫停 / 地圖" class="glass-panel hover:bg-white/15 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-bold shadow-lg">
           ⚙️ 選單
         </button>
       </div>
     </div>
 
-    <!-- Top-Edge Compact Callout Banner (non-blocking on mobile portrait & landscape) -->
-    <div id="callout-banner" class="hidden absolute top-[72px] sm:top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center max-w-[86vw]">
-      <div id="callout-box" class="callout-anim px-3 py-1 sm:px-4 sm:py-1.5 rounded-full bg-slate-900/55 border border-amber-400/50 shadow-lg backdrop-blur-sm">
-        <div id="callout-title" class="text-xs sm:text-xl font-black tracking-wide text-amber-300 drop-shadow whitespace-nowrap">ACE!</div>
-        <div id="callout-sub" class="text-[10px] sm:text-xs font-semibold text-white/90 leading-tight"></div>
+    <!-- Top-Edge Compact Callout Banner -->
+    <div id="callout-banner" class="hidden absolute top-[76px] sm:top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center max-w-[88vw]">
+      <div id="callout-box" class="callout-anim px-3.5 py-1 sm:px-5 sm:py-2 rounded-full sm:rounded-2xl bg-slate-900/55 border border-amber-400/50 shadow-lg backdrop-blur-sm">
+        <div id="callout-title" class="text-sm sm:text-2xl font-black tracking-wide text-amber-300 drop-shadow whitespace-nowrap">ACE!</div>
+        <div id="callout-sub" class="text-[11px] sm:text-sm font-semibold text-white/90 leading-tight"></div>
       </div>
     </div>
 
@@ -205,7 +288,7 @@
     <!-- Desktop Controls Hint -->
     <div id="desktop-hint" class="hidden absolute bottom-3 left-4 z-10 pointer-events-none">
       <div class="glass-panel rounded-xl px-3 py-1.5 text-[11px] text-white/80 flex items-center gap-3">
-        <span><b class="text-amber-300">WASD / 方向鍵</b> 移動 & 控球方向</span>
+        <span><b class="text-amber-300">WASD / 方向鍵</b> 移動 & 控球方向 (W深球 / A左 / D右)</span>
         <span><b class="text-amber-300">空白鍵 / 左鍵</b> 擊球 (雙擊加速)</span>
         <span><b class="text-amber-300">Shift / K / 右鍵</b> 高吊切球</span>
       </div>
@@ -229,127 +312,16 @@
       </div>
     </div>
 
-    <!-- Main Setup / Start Menu Modal -->
-    <div id="setup-modal" class="absolute inset-0 z-30 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto">
-      <div class="glass-panel w-full max-w-2xl rounded-3xl p-5 sm:p-7 text-white shadow-2xl my-auto max-h-[94dvh] overflow-y-auto">
-        <div class="flex items-center justify-between gap-3 mb-4">
-          <div>
-            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-bold mb-1.5">
-              <span>🏆</span> 3D 卡通網球公開賽
-            </div>
-            <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white">選擇你的比賽設定</h1>
-          </div>
-          <div class="text-4xl sm:text-5xl">🎾</div>
-        </div>
-
-        <!-- Row 1: Mode & Gender -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">比賽賽制 (單打 / 雙打)</label>
-            <div class="grid grid-cols-2 gap-2">
-              <button type="button" data-mode="singles" class="mode-btn option-btn selected rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 text-sm font-bold flex items-center justify-center gap-1.5">
-                <span>👤</span> 單打 1v1
-              </button>
-              <button type="button" data-mode="doubles" class="mode-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 text-sm font-bold flex items-center justify-center gap-1.5">
-                <span>👥</span> 雙打 2v2
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">選手性別 (3D卡通造型)</label>
-            <div class="grid grid-cols-2 gap-2">
-              <button type="button" data-gender="male" class="gender-btn option-btn selected rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 text-sm font-bold flex items-center justify-center gap-1.5">
-                <span>👦</span> 男生選手
-              </button>
-              <button type="button" data-gender="female" class="gender-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 text-sm font-bold flex items-center justify-center gap-1.5">
-                <span>👧</span> 女生選手
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Row 2: 4 Grand Slam Courts -->
-        <div class="mb-5">
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">選擇大滿貫場地 (4種不同彈跳與球速)</label>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <button type="button" data-court="usopen" class="court-card selected text-left rounded-2xl border-2 border-white/15 bg-slate-800/80 p-3">
-              <div class="w-full h-9 rounded-lg mb-2 flex overflow-hidden border border-white/20">
-                <div class="w-2/3 h-full bg-blue-600"></div>
-                <div class="w-1/3 h-full bg-emerald-700"></div>
-              </div>
-              <div class="font-extrabold text-sm text-white">美網 US Open</div>
-              <div class="text-[11px] text-sky-300 font-semibold">硬地 • 彈跳均衡</div>
-            </button>
-
-            <button type="button" data-court="frenchopen" class="court-card text-left rounded-2xl border-2 border-white/15 bg-slate-800/80 p-3">
-              <div class="w-full h-9 rounded-lg mb-2 flex overflow-hidden border border-white/20">
-                <div class="w-full h-full bg-[#c25934]"></div>
-              </div>
-              <div class="font-extrabold text-sm text-white">法網 Roland-Garros</div>
-              <div class="text-[11px] text-orange-300 font-semibold">紅土 • 高彈慢速</div>
-            </button>
-
-            <button type="button" data-court="wimbledon" class="court-card text-left rounded-2xl border-2 border-white/15 bg-slate-800/80 p-3">
-              <div class="w-full h-9 rounded-lg mb-2 flex overflow-hidden border border-white/20">
-                <div class="w-2/3 h-full bg-emerald-600"></div>
-                <div class="w-1/3 h-full bg-emerald-800"></div>
-              </div>
-              <div class="font-extrabold text-sm text-white">溫網 Wimbledon</div>
-              <div class="text-[11px] text-emerald-300 font-semibold">草地 • 低平快速</div>
-            </button>
-
-            <button type="button" data-court="ausopen" class="court-card text-left rounded-2xl border-2 border-white/15 bg-slate-800/80 p-3">
-              <div class="w-full h-9 rounded-lg mb-2 flex overflow-hidden border border-white/20">
-                <div class="w-2/3 h-full bg-sky-500"></div>
-                <div class="w-1/3 h-full bg-blue-900"></div>
-              </div>
-              <div class="font-extrabold text-sm text-white">澳網 Aus Open</div>
-              <div class="text-[11px] text-cyan-300 font-semibold">晴空硬地 • 明快</div>
-            </button>
-          </div>
-        </div>
-
-        <!-- Row 3: Difficulty & Match Length -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">對手難度</label>
-            <div class="grid grid-cols-3 gap-2">
-              <button type="button" data-diff="easy" class="diff-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">輕鬆</button>
-              <button type="button" data-diff="normal" class="diff-btn option-btn selected rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">標準</button>
-              <button type="button" data-diff="hard" class="diff-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">職業</button>
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">賽盤局數</label>
-            <div class="grid grid-cols-3 gap-2">
-              <button type="button" data-games="2" class="games-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">搶 2 局</button>
-              <button type="button" data-games="3" class="games-btn option-btn selected rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">搶 3 局</button>
-              <button type="button" data-games="6" class="games-btn option-btn rounded-xl border border-white/15 bg-white/5 py-2 text-xs sm:text-sm font-bold">搶 6 局</button>
-            </div>
-          </div>
-        </div>
-
-        <button id="btn-start-match" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400 hover:brightness-105 text-slate-950 font-black text-lg shadow-xl transition active:scale-[0.99]">
-          🎾 開始比賽！START MATCH
-        </button>
-
-        <p class="text-center text-[11px] text-slate-400 mt-3">
-          支援電腦鍵盤滑鼠 (WASD/方向鍵 + 空白鍵) 與手機觸控搖桿操作
-        </p>
-      </div>
-    </div>
-
     <!-- Pause / Match Over Modal -->
     <div id="pause-modal" class="hidden absolute inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
       <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-white text-center shadow-2xl">
         <div id="pause-emoji" class="text-5xl mb-2">⏸️</div>
         <h2 id="pause-title" class="text-2xl font-black mb-1">比賽暫停</h2>
-        <p id="pause-subtitle" class="text-sm text-slate-300 mb-5">隨時調整設定或繼續比賽</p>
+        <p id="pause-subtitle" class="text-sm text-slate-300 mb-5">隨時調整設定或返回群島地圖</p>
         <div class="flex flex-col gap-2.5">
           <button id="btn-resume" class="w-full py-3 rounded-xl bg-amber-400 text-slate-950 font-black text-base hover:brightness-105">繼續比賽</button>
           <button id="btn-restart-same" class="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/15">重新開始本場</button>
-          <button id="btn-back-setup" class="w-full py-3 rounded-xl bg-white/5 hover:bg-white/15 text-slate-200 font-bold text-sm border border-white/10">更換場地 / 賽制 / 性別</button>
+          <button id="btn-back-setup" class="w-full py-3 rounded-xl bg-white/5 hover:bg-white/15 text-slate-200 font-bold text-sm border border-white/10">🏝️ 返回 3D 群島地圖</button>
         </div>
       </div>
     </div>
@@ -357,11 +329,14 @@
 
   <script>
     // =========================================================================
-    // 1. GAME CONFIGURATION & COURT DEFINITIONS
+    // 1. CONFIGURATION: 4 GRAND SLAMS & ISLAND METADATA
     // =========================================================================
     const COURTS = {
       usopen: {
         name: '美網 US OPEN',
+        badge: '🇺🇸 硬地球場 • 紐約',
+        landmarks: '島上地標：自由女神像 + 麥當勞',
+        desc: '藍色內場配綠色外圍的經典硬地，球速與彈跳最為均衡。選手穿著活力正式網球套裝（女生網球裙）。',
         surface: 'hard',
         innerColor: '#1d4ed8',
         outerColor: '#15803d',
@@ -373,10 +348,16 @@
         speedKeep: 0.88,
         particleColor: null,
         hasGrassStripes: false,
-        hasClayGrain: false
+        hasClayGrain: false,
+        islandPos: new THREE.Vector3(-6.2, 0, -4.6),
+        sandColor: 0xfde68a,
+        grassColor: 0x4ade80
       },
       frenchopen: {
         name: '法網 ROLAND-GARROS',
+        badge: '🇫🇷 紅土球場 • 巴黎',
+        landmarks: '島上地標：艾菲爾鐵塔 + 法國長麵包',
+        desc: '羅蘭加洛斯紅土，摩擦係數高、球彈跳較高且球速變慢，適合底線拉鋸。選手穿著正式網球套裝。',
         surface: 'clay',
         innerColor: '#c25934',
         outerColor: '#9e4324',
@@ -388,10 +369,16 @@
         speedKeep: 0.75,
         particleColor: 0xd96b43,
         hasGrassStripes: false,
-        hasClayGrain: true
+        hasClayGrain: true,
+        islandPos: new THREE.Vector3(6.2, 0, -4.6),
+        sandColor: 0xfed7aa,
+        grassColor: 0xd97706
       },
       wimbledon: {
         name: '溫網 WIMBLEDON',
+        badge: '🇬🇧 草地球場 • 倫敦',
+        landmarks: '島上地標：白金漢宮 + 英國衛兵',
+        desc: '全英草地俱樂部草地球場，球彈跳低平快速！依溫網傳統，所有選手一律穿著全白上衣與白色褲／裙。',
         surface: 'grass',
         innerColor: '#1f7a3f',
         outerColor: '#14532d',
@@ -403,10 +390,16 @@
         speedKeep: 0.94,
         particleColor: 0x4ade80,
         hasGrassStripes: true,
-        hasClayGrain: false
+        hasClayGrain: false,
+        islandPos: new THREE.Vector3(-6.2, 0, 4.6),
+        sandColor: 0xfef08a,
+        grassColor: 0x22c55e
       },
       ausopen: {
-        name: '澳網 AUS OPEN',
+        name: '澳網 AUSTRALIAN OPEN',
+        badge: '🇦🇺 晴空硬地 • 墨爾本',
+        landmarks: '島上地標：雪梨歌劇院 + 袋鼠',
+        desc: '墨爾本晴空藍硬地球場，視野明快、彈跳穩定。選手穿著正式網球套裝（女生穿網球裙）迎戰陽光賽場。',
         surface: 'hard',
         innerColor: '#0284c7',
         outerColor: '#1e3a8a',
@@ -418,7 +411,10 @@
         speedKeep: 0.87,
         particleColor: null,
         hasGrassStripes: false,
-        hasClayGrain: false
+        hasClayGrain: false,
+        islandPos: new THREE.Vector3(6.2, 0, 4.6),
+        sandColor: 0xfde68a,
+        grassColor: 0x34d399
       }
     };
 
@@ -430,12 +426,13 @@
     const GRAVITY = -19.5;
 
     const DIFFICULTY = {
-      easy:   { aiSpeed: 3.4,  aiReact: 0.42, aiError: 2.2,  aiPower: 0.64, aiMissRate: 0.16 },
-      normal: { aiSpeed: 7.6,  aiReact: 0.86, aiError: 0.75, aiPower: 0.95, aiMissRate: 0.03 },
-      hard:   { aiSpeed: 10.0, aiReact: 0.98, aiError: 0.2,  aiPower: 1.10, aiMissRate: 0.0 }
+      easy:   { aiSpeed: 5.8,  aiReact: 0.72, aiError: 1.5, aiPower: 0.82 },
+      normal: { aiSpeed: 7.8,  aiReact: 0.88, aiError: 0.75, aiPower: 0.96 },
+      hard:   { aiSpeed: 9.8,  aiReact: 0.97, aiError: 0.25, aiPower: 1.08 }
     };
 
     const state = {
+      viewMode: 'map', // 'map' | 'match'
       mode: 'singles',
       gender: 'male',
       courtKey: 'usopen',
@@ -540,53 +537,38 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
         osc.start(now);
         osc.stop(now + 0.14);
-      } else if (type === 'game_win') {
-        // Uplifting game-win fanfare arpeggio
-        const notes = [523.25, 659.25, 783.99, 1046.5];
-        notes.forEach((freq, idx) => {
-          const o = audioCtx.createOscillator();
-          const g = audioCtx.createGain();
-          o.type = 'triangle';
-          o.connect(g);
-          g.connect(audioCtx.destination);
-          const t0 = now + idx * 0.09;
-          o.frequency.setValueAtTime(freq, t0);
-          g.gain.setValueAtTime(0.22, t0);
-          g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.34);
-          o.start(t0);
-          o.stop(t0 + 0.35);
-        });
-      } else if (type === 'match_win') {
-        // Grand Slam championship celebratory fanfare + chord
-        const melody = [
-          { f: 523.25, t: 0.00, d: 0.14 },
-          { f: 659.25, t: 0.13, d: 0.14 },
-          { f: 783.99, t: 0.26, d: 0.14 },
-          { f: 1046.5, t: 0.40, d: 0.32 },
-          { f: 783.99, t: 0.72, d: 0.16 },
-          { f: 1046.5, t: 0.90, d: 0.65 },
-          { f: 659.25, t: 0.90, d: 0.65 },
-          { f: 523.25, t: 0.90, d: 0.65 }
-        ];
-        melody.forEach(n => {
-          const o = audioCtx.createOscillator();
-          const g = audioCtx.createGain();
-          o.type = 'triangle';
-          o.connect(g);
-          g.connect(audioCtx.destination);
-          o.frequency.setValueAtTime(n.f, now + n.t);
-          g.gain.setValueAtTime(0.2, now + n.t);
-          g.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
-          o.start(now + n.t);
-          o.stop(now + n.t + n.d + 0.02);
-        });
+      } else if (type === 'select') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(660, now + 0.08);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
       }
     }
 
     // =========================================================================
-    // 3. THREE.JS SCENE, COURT & STADIUM BUILDER
+    // 3. SHARED RENDERER + TWO SCENES (3D ARCHIPELAGO MAP + 3D TENNIS MATCH)
     // =========================================================================
-    let scene, camera, renderer, dirLight, ambientLight;
+    let renderer;
+    let mapScene, mapCamera, oceanMesh;
+    const islandGroups = [];
+    const islandClickTargets = [];
+    const mapClouds = [];
+
+    const mapOrbit = {
+      theta: 0.35,
+      phi: 0.78,
+      radius: 25.5,
+      targetTheta: 0.35,
+      targetPhi: 0.78,
+      targetRadius: 25.5,
+      lookAt: new THREE.Vector3(0, 0.6, 0),
+      targetLookAt: new THREE.Vector3(0, 0.6, 0)
+    };
+
+    let scene, camera, dirLight, ambientLight;
     let courtGroup = null;
     let playersGroup = null;
     let ballMesh, ballShadowMesh, targetRingMesh, serviceBoxMesh;
@@ -597,11 +579,388 @@
       vel: new THREE.Vector3(0, 0, 0),
       active: false
     };
-
     const characters = [];
 
-    function initThree() {
+    function initRenderer() {
       const canvas = document.getElementById('three-canvas');
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      window.addEventListener('resize', onResize);
+    }
+
+    function onResize() {
+      if (!renderer) return;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      if (mapCamera) {
+        mapCamera.aspect = w / h;
+        mapCamera.updateProjectionMatrix();
+      }
+      if (camera) {
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      renderer.setSize(w, h);
+    }
+
+    // =========================================================================
+    // 4. 3D TOY-DIORAMA ARCHIPELAGO WORLD MAP BUILDER
+    // =========================================================================
+    function createIslandBase(cfg) {
+      const grp = new THREE.Group();
+
+      // Toy-style stepped sandy base + grassy top
+      const sandMat = new THREE.MeshStandardMaterial({ color: cfg.sandColor, roughness: 0.85 });
+      const topMat = new THREE.MeshStandardMaterial({ color: cfg.grassColor, roughness: 0.75 });
+      const rockMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.9 });
+
+      const underwater = new THREE.Mesh(new THREE.CylinderGeometry(4.1, 3.3, 1.0, 24), rockMat);
+      underwater.position.y = -0.5;
+      grp.add(underwater);
+
+      const beach = new THREE.Mesh(new THREE.CylinderGeometry(3.85, 4.15, 0.55, 24), sandMat);
+      beach.position.y = 0.25;
+      beach.receiveShadow = true;
+      beach.castShadow = true;
+      grp.add(beach);
+
+      const grassTop = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.45, 0.45, 24), topMat);
+      grassTop.position.y = 0.65;
+      grassTop.receiveShadow = true;
+      grassTop.castShadow = true;
+      grp.add(grassTop);
+
+      // Cute miniature tennis court pad on each island
+      const padGroup = new THREE.Group();
+      padGroup.position.set(0.95, 0.89, 1.15);
+      padGroup.rotation.y = -0.25;
+      const padOuter = new THREE.Mesh(
+        new THREE.BoxGeometry(1.75, 0.06, 2.3),
+        new THREE.MeshStandardMaterial({ color: cfg.outerColor, roughness: 0.7 })
+      );
+      const padInner = new THREE.Mesh(
+        new THREE.BoxGeometry(1.3, 0.07, 1.85),
+        new THREE.MeshStandardMaterial({ color: cfg.innerColor, roughness: 0.7 })
+      );
+      const padNet = new THREE.Mesh(
+        new THREE.BoxGeometry(1.4, 0.14, 0.04),
+        new THREE.MeshStandardMaterial({ color: 0xffffff })
+      );
+      padNet.position.y = 0.08;
+      padGroup.add(padOuter, padInner, padNet);
+      grp.add(padGroup);
+
+      // Invisible generous hitbox for smooth clicking
+      const hitbox = new THREE.Mesh(
+        new THREE.CylinderGeometry(4.2, 4.2, 4.2, 16),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      hitbox.position.y = 1.8;
+      hitbox.userData.courtKey = null; // set by caller
+      grp.add(hitbox);
+
+      return { grp, hitbox };
+    }
+
+    function buildUSLandmarks(parent) {
+      // 1. Statue of Liberty
+      const sol = new THREE.Group();
+      sol.position.set(-1.1, 0.88, -0.5);
+      const stoneMat = new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.75 });
+      const libertyMat = new THREE.MeshStandardMaterial({ color: 0x5eead4, roughness: 0.55 });
+      const goldMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xf59e0b, emissiveIntensity: 0.4 });
+
+      const ped1 = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.5, 1.1), stoneMat);
+      ped1.position.y = 0.25;
+      ped1.castShadow = true;
+      const ped2 = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.85, 0.78), stoneMat);
+      ped2.position.y = 0.92;
+      ped2.castShadow = true;
+
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.36, 1.45, 12), libertyMat);
+      body.position.y = 2.05;
+      body.castShadow = true;
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 12), libertyMat);
+      head.position.y = 2.92;
+      const crown = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.22, 7), libertyMat);
+      crown.position.y = 3.12;
+
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.85, 8), libertyMat);
+      arm.position.set(0.28, 2.85, 0);
+      arm.rotation.z = -0.25;
+      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.26, 8), goldMat);
+      flame.position.set(0.4, 3.35, 0);
+
+      sol.add(ped1, ped2, body, head, crown, arm, flame);
+      parent.add(sol);
+
+      // 2. McDonald's Golden Arches Logo Sign
+      const mcd = new THREE.Group();
+      mcd.position.set(1.25, 0.88, -0.95);
+      mcd.rotation.y = -0.3;
+      const redMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.45 });
+      const yellowMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35, emissive: 0.15 });
+
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.1, 8), new THREE.MeshStandardMaterial({ color: 0x475569 }));
+      pole.position.y = 0.55;
+      const signBox = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.9, 0.22), redMat);
+      signBox.position.y = 1.4;
+      signBox.castShadow = true;
+
+      // Two golden arches forming "M"
+      const archGeo = new THREE.TorusGeometry(0.22, 0.065, 8, 16, Math.PI);
+      const archL = new THREE.Mesh(archGeo, yellowMat);
+      archL.position.set(-0.2, 1.32, 0.12);
+      archL.scale.set(0.85, 1.55, 1);
+      const archR = new THREE.Mesh(archGeo, yellowMat);
+      archR.position.set(0.2, 1.32, 0.12);
+      archR.scale.set(0.85, 1.55, 1);
+
+      mcd.add(pole, signBox, archL, archR);
+      parent.add(mcd);
+    }
+
+    function buildFranceLandmarks(parent) {
+      // 1. Eiffel Tower
+      const eiffel = new THREE.Group();
+      eiffel.position.set(-0.95, 0.88, -0.55);
+      const ironMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.5, metalness: 0.25 });
+
+      // 4 legs
+      [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]].forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.16, 1.35, 8), ironMat);
+        leg.position.set(lx * 0.72, 0.62, lz * 0.72);
+        leg.rotation.z = lx > 0 ? 0.22 : -0.22;
+        leg.rotation.x = lz > 0 ? -0.22 : 0.22;
+        leg.castShadow = true;
+        eiffel.add(leg);
+      });
+      const deck1 = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.14, 0.95), ironMat);
+      deck1.position.y = 1.25;
+      const mid = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.42, 1.2, 4), ironMat);
+      mid.rotation.y = Math.PI / 4;
+      mid.position.y = 1.9;
+      mid.castShadow = true;
+      const deck2 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.12, 0.45), ironMat);
+      deck2.position.y = 2.52;
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(0.15, 1.15, 4), ironMat);
+      spire.rotation.y = Math.PI / 4;
+      spire.position.y = 3.12;
+      spire.castShadow = true;
+      eiffel.add(deck1, mid, deck2, spire);
+      parent.add(eiffel);
+
+      // 2. French Baguette on wooden board
+      const bagGroup = new THREE.Group();
+      bagGroup.position.set(1.15, 0.88, -0.85);
+      bagGroup.rotation.y = 0.45;
+      const board = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 0.12, 0.75),
+        new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 })
+      );
+      board.position.y = 0.06;
+      const breadMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.65 });
+      const crustMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.7 });
+      const baguette = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), breadMat);
+      baguette.scale.set(2.3, 0.75, 0.85);
+      baguette.position.y = 0.28;
+      baguette.castShadow = true;
+      bagGroup.add(board, baguette);
+      [-0.35, 0, 0.35].forEach(sx => {
+        const slash = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.36), crustMat);
+        slash.position.set(sx, 0.46, 0);
+        slash.rotation.y = 0.4;
+        bagGroup.add(slash);
+      });
+      parent.add(bagGroup);
+    }
+
+    function buildUKLandmarks(parent) {
+      // 1. Buckingham Palace
+      const palace = new THREE.Group();
+      palace.position.set(-0.9, 0.88, -0.65);
+      const stoneMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.75 });
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6 });
+      const redMat = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
+
+      const mainBody = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.05, 1.1), stoneMat);
+      mainBody.position.y = 0.52;
+      mainBody.castShadow = true;
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(2.36, 0.2, 1.16), roofMat);
+      roof.position.y = 1.14;
+      const pediment = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.42, 4), stoneMat);
+      pediment.rotation.y = Math.PI / 4;
+      pediment.position.set(0, 1.38, 0.22);
+
+      // Columns
+      [-0.5, -0.2, 0.2, 0.5].forEach(cx => {
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.95, 8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+        col.position.set(cx, 0.5, 0.58);
+        palace.add(col);
+      });
+      // Flagpole + Union Jack flag
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.75, 6), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+      pole.position.set(0, 1.75, 0);
+      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.26, 0.03), redMat);
+      flag.position.set(0.22, 1.98, 0);
+      palace.add(mainBody, roof, pediment, pole, flag);
+      parent.add(palace);
+
+      // 2. Royal Guard
+      const guard = new THREE.Group();
+      guard.position.set(1.25, 0.88, -0.75);
+      const blackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7 });
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0xfcd5b5, roughness: 0.6 });
+
+      const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.65, 10), blackMat);
+      legs.position.y = 0.32;
+      const tunic = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.22, 0.65, 10), redMat);
+      tunic.position.y = 0.92;
+      tunic.castShadow = true;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), skinMat);
+      head.position.y = 1.38;
+      const bearskin = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.55, 12), blackMat);
+      bearskin.position.y = 1.72;
+      bearskin.castShadow = true;
+      guard.add(legs, tunic, head, bearskin);
+      parent.add(guard);
+    }
+
+    function buildAustraliaLandmarks(parent) {
+      // 1. Sydney Opera House
+      const opera = new THREE.Group();
+      opera.position.set(-0.95, 0.88, -0.6);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.7 });
+      const sailMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 });
+
+      const podium = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.32, 1.5), baseMat);
+      podium.position.y = 0.16;
+      podium.castShadow = true;
+      opera.add(podium);
+
+      // Iconic curved shell sails
+      [
+        { x: -0.65, z: 0, s: 1.0, r: 0.2 },
+        { x: -0.05, z: -0.1, s: 1.25, r: 0.12 },
+        { x: 0.6, z: 0.05, s: 0.9, r: -0.15 }
+      ].forEach(sh => {
+        const sail = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 12, 0, Math.PI, 0, Math.PI * 0.65), sailMat);
+        sail.scale.set(0.85 * sh.s, 1.35 * sh.s, 0.65 * sh.s);
+        sail.position.set(sh.x, 0.3, sh.z);
+        sail.rotation.y = sh.r;
+        sail.castShadow = true;
+        opera.add(sail);
+      });
+      parent.add(opera);
+
+      // 2. Cute Kangaroo
+      const roo = new THREE.Group();
+      roo.position.set(1.2, 0.88, -0.8);
+      roo.rotation.y = -0.5;
+      const furMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.75 });
+      const bellyMat = new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.75 });
+
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 12), furMat);
+      body.scale.set(0.85, 1.35, 0.9);
+      body.position.y = 0.55;
+      body.castShadow = true;
+      const pouch = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10), bellyMat);
+      pouch.position.set(0, 0.48, 0.16);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), furMat);
+      head.position.set(0, 1.08, 0.12);
+      const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.22, 8), furMat);
+      snout.rotation.x = Math.PI / 2;
+      snout.position.set(0, 1.05, 0.3);
+      [-0.1, 0.1].forEach(ex => {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.28, 6), furMat);
+        ear.position.set(ex, 1.32, 0.08);
+        roo.add(ear);
+      });
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.9, 8), furMat);
+      tail.rotation.x = -1.1;
+      tail.position.set(0, 0.28, -0.45);
+      roo.add(body, pouch, head, snout, tail);
+      parent.add(roo);
+    }
+
+    function initMapScene() {
+      mapScene = new THREE.Scene();
+      mapScene.background = new THREE.Color(0xbae6fd);
+      mapScene.fog = new THREE.Fog(0xe0f2fe, 34, 85);
+
+      mapCamera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.1, 140);
+
+      const hemi = new THREE.HemisphereLight(0xfffbeb, 0x38bdf8, 0.85);
+      mapScene.add(hemi);
+
+      const sun = new THREE.DirectionalLight(0xfff7ed, 0.95);
+      sun.position.set(16, 26, 14);
+      sun.castShadow = true;
+      sun.shadow.mapSize.width = 1024;
+      sun.shadow.mapSize.height = 1024;
+      const d = 22;
+      sun.shadow.camera.left = -d;
+      sun.shadow.camera.right = d;
+      sun.shadow.camera.top = d;
+      sun.shadow.camera.bottom = -d;
+      mapScene.add(sun);
+
+      // Warm toy ocean
+      const oceanGeo = new THREE.PlaneGeometry(140, 140, 24, 24);
+      oceanGeo.rotateX(-Math.PI / 2);
+      const oceanMat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        roughness: 0.3,
+        metalness: 0.08,
+        flatShading: true
+      });
+      oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
+      oceanMesh.receiveShadow = true;
+      mapScene.add(oceanMesh);
+
+      // Decorative fluffy clouds
+      const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
+      for (let i = 0; i < 6; i++) {
+        const cg = new THREE.Group();
+        [[-0.6, 0, 0, 0.7], [0, 0.25, 0, 0.95], [0.65, 0.05, 0, 0.7]].forEach(([x, y, z, r]) => {
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 10), cloudMat);
+          puff.position.set(x, y, z);
+          cg.add(puff);
+        });
+        const angle = (i / 6) * Math.PI * 2;
+        cg.position.set(Math.cos(angle) * 16, 6.5 + (i % 2) * 1.5, Math.sin(angle) * 14);
+        mapScene.add(cg);
+        mapClouds.push({ mesh: cg, angle, radius: 16, speed: 0.04 + (i % 3) * 0.015 });
+      }
+
+      // Build 4 Grand Slam Islands
+      const builders = {
+        usopen: buildUSLandmarks,
+        frenchopen: buildFranceLandmarks,
+        wimbledon: buildUKLandmarks,
+        ausopen: buildAustraliaLandmarks
+      };
+
+      Object.keys(COURTS).forEach(key => {
+        const cfg = COURTS[key];
+        const { grp, hitbox } = createIslandBase(cfg);
+        grp.position.copy(cfg.islandPos);
+        hitbox.userData.courtKey = key;
+        builders[key](grp);
+        mapScene.add(grp);
+        islandGroups.push({ key, grp });
+        islandClickTargets.push(hitbox);
+      });
+    }
+
+    // =========================================================================
+    // 5. 3D TENNIS MATCH SCENE, COURT & DRESS-CODE CHARACTERS
+    // =========================================================================
+    function initMatchScene() {
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x0f172a);
       scene.fog = new THREE.Fog(0x0f172a, 34, 78);
@@ -609,12 +968,6 @@
       camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 130);
       camera.position.set(0, 10.2, 22.8);
       camera.lookAt(0, 0.85, 1.6);
-
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
       ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
       scene.add(ambientLight);
@@ -633,53 +986,35 @@
       dirLight.shadow.camera.bottom = -d;
       scene.add(dirLight);
 
-      const ballGeo = new THREE.SphereGeometry(0.18, 16, 16);
-      const ballMat = new THREE.MeshStandardMaterial({
-        color: 0xd9f99d,
-        emissive: 0x84cc16,
-        emissiveIntensity: 0.25,
-        roughness: 0.45
-      });
-      ballMesh = new THREE.Mesh(ballGeo, ballMat);
+      ballMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 16, 16),
+        new THREE.MeshStandardMaterial({ color: 0xd9f99d, emissive: 0x84cc16, emissiveIntensity: 0.25, roughness: 0.45 })
+      );
       ballMesh.castShadow = true;
       scene.add(ballMesh);
 
       const shGeo = new THREE.CircleGeometry(0.24, 16);
       shGeo.rotateX(-Math.PI / 2);
-      const shMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38 });
-      ballShadowMesh = new THREE.Mesh(shGeo, shMat);
+      ballShadowMesh = new THREE.Mesh(shGeo, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38 }));
       ballShadowMesh.position.y = 0.02;
       scene.add(ballShadowMesh);
 
       const ringGeo = new THREE.RingGeometry(0.24, 0.36, 24);
       ringGeo.rotateX(-Math.PI / 2);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
-      targetRingMesh = new THREE.Mesh(ringGeo, ringMat);
+      targetRingMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
       targetRingMesh.position.y = 0.025;
       targetRingMesh.visible = false;
       scene.add(targetRingMesh);
 
       const sbGeo = new THREE.PlaneGeometry(SINGLES_HALF_W, SERVICE_LINE_Z);
       sbGeo.rotateX(-Math.PI / 2);
-      const sbMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.18, side: THREE.DoubleSide });
-      serviceBoxMesh = new THREE.Mesh(sbGeo, sbMat);
+      serviceBoxMesh = new THREE.Mesh(sbGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.18, side: THREE.DoubleSide }));
       serviceBoxMesh.position.y = 0.018;
       serviceBoxMesh.visible = false;
       scene.add(serviceBoxMesh);
 
       buildCourt(state.courtKey);
       buildCharacters();
-
-      window.addEventListener('resize', onResize);
-    }
-
-    function onResize() {
-      if (!renderer || !camera) return;
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
     }
 
     function createCourtTexture(cfg, isInner) {
@@ -709,9 +1044,7 @@
     }
 
     function buildCourt(courtKey) {
-      if (courtGroup) {
-        scene.remove(courtGroup);
-      }
+      if (courtGroup) scene.remove(courtGroup);
       courtGroup = new THREE.Group();
       const cfg = COURTS[courtKey];
 
@@ -721,17 +1054,13 @@
 
       const outerGeo = new THREE.PlaneGeometry(24, 38);
       outerGeo.rotateX(-Math.PI / 2);
-      const outerTex = createCourtTexture(cfg, false);
-      const outerMat = new THREE.MeshStandardMaterial({ map: outerTex, roughness: 0.85 });
-      const outerMesh = new THREE.Mesh(outerGeo, outerMat);
+      const outerMesh = new THREE.Mesh(outerGeo, new THREE.MeshStandardMaterial({ map: createCourtTexture(cfg, false), roughness: 0.85 }));
       outerMesh.receiveShadow = true;
       courtGroup.add(outerMesh);
 
       const innerGeo = new THREE.PlaneGeometry(DOUBLES_HALF_W * 2, COURT_HALF_LEN * 2);
       innerGeo.rotateX(-Math.PI / 2);
-      const innerTex = createCourtTexture(cfg, true);
-      const innerMat = new THREE.MeshStandardMaterial({ map: innerTex, roughness: 0.8 });
-      const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+      const innerMesh = new THREE.Mesh(innerGeo, new THREE.MeshStandardMaterial({ map: createCourtTexture(cfg, true), roughness: 0.8 }));
       innerMesh.position.y = 0.005;
       innerMesh.receiveShadow = true;
       courtGroup.add(innerMesh);
@@ -766,20 +1095,17 @@
         courtGroup.add(post);
       });
 
-      const netGeo = new THREE.PlaneGeometry((DOUBLES_HALF_W + 0.4) * 2, NET_HEIGHT);
-      const netMat = new THREE.MeshStandardMaterial({
-        color: 0x0f172a,
-        transparent: true,
-        opacity: 0.62,
-        side: THREE.DoubleSide
-      });
-      const netMesh = new THREE.Mesh(netGeo, netMat);
+      const netMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry((DOUBLES_HALF_W + 0.4) * 2, NET_HEIGHT),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, transparent: true, opacity: 0.62, side: THREE.DoubleSide })
+      );
       netMesh.position.set(0, NET_HEIGHT / 2, 0);
       courtGroup.add(netMesh);
 
-      const tapeGeo = new THREE.BoxGeometry((DOUBLES_HALF_W + 0.4) * 2, 0.08, 0.06);
-      const tapeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-      const tapeMesh = new THREE.Mesh(tapeGeo, tapeMat);
+      const tapeMesh = new THREE.Mesh(
+        new THREE.BoxGeometry((DOUBLES_HALF_W + 0.4) * 2, 0.08, 0.06),
+        new THREE.MeshStandardMaterial({ color: 0xffffff })
+      );
       tapeMesh.position.set(0, NET_HEIGHT, 0);
       courtGroup.add(tapeMesh);
 
@@ -824,15 +1150,13 @@
       scene.add(courtGroup);
     }
 
-    // =========================================================================
-    // 4. 3D CARTOON CHARACTER BUILDER (MALE & FEMALE)
-    // =========================================================================
-    function createCartoonPlayer({ gender, shirtColor, accentColor, skinColor, hairColor, facingZ }) {
+    function createCartoonPlayer({ gender, shirtColor, bottomColor, trimColor, skinColor, hairColor, facingZ }) {
       const root = new THREE.Group();
 
       const skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.65 });
       const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.55 });
-      const accentMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.6 });
+      const bottomMat = new THREE.MeshStandardMaterial({ color: bottomColor, roughness: 0.6 });
+      const trimMat = new THREE.MeshStandardMaterial({ color: trimColor, roughness: 0.5 });
       const hairMat = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.7 });
       const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
       const darkMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
@@ -862,35 +1186,43 @@
       rightLeg.add(rLegMesh, rShoe);
       root.add(rightLeg);
 
+      // Formal Tennis Outfit Bottom: Female MUST wear pleated tennis skirt; Male wears tennis shorts
       if (gender === 'female') {
-        const skirtGeo = new THREE.CylinderGeometry(0.28, 0.44, 0.38, 16);
-        const skirt = new THREE.Mesh(skirtGeo, accentMat);
+        const skirtGeo = new THREE.CylinderGeometry(0.28, 0.46, 0.40, 18);
+        const skirt = new THREE.Mesh(skirtGeo, bottomMat);
         skirt.position.y = 0.78;
         skirt.castShadow = true;
         root.add(skirt);
+        // Waistband trim
+        const waist = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.295, 0.06, 16), trimMat);
+        waist.position.y = 0.96;
+        root.add(waist);
       } else {
-        const shortsGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.34, 14);
-        const shorts = new THREE.Mesh(shortsGeo, accentMat);
+        const shortsGeo = new THREE.CylinderGeometry(0.28, 0.33, 0.36, 14);
+        const shorts = new THREE.Mesh(shortsGeo, bottomMat);
         shorts.position.y = 0.78;
         shorts.castShadow = true;
         root.add(shorts);
+        const waist = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.285, 0.06, 14), trimMat);
+        waist.position.y = 0.95;
+        root.add(waist);
       }
 
-      const torsoGeo = new THREE.CylinderGeometry(
-        gender === 'female' ? 0.26 : 0.32,
-        0.26,
-        0.64,
-        14
-      );
+      // Formal Tennis Polo / Jersey Torso with collar
+      const torsoGeo = new THREE.CylinderGeometry(gender === 'female' ? 0.26 : 0.32, 0.26, 0.64, 14);
       const torso = new THREE.Mesh(torsoGeo, shirtMat);
-      torso.position.y = 1.22;
+      torso.position.y = 1.24;
       torso.castShadow = true;
       root.add(torso);
 
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.035, 8, 16), trimMat);
+      collar.rotation.x = Math.PI / 2;
+      collar.position.y = 1.56;
+      root.add(collar);
+
       const headGroup = new THREE.Group();
-      headGroup.position.y = 1.84;
-      const headGeo = new THREE.SphereGeometry(0.36, 18, 18);
-      const head = new THREE.Mesh(headGeo, skinMat);
+      headGroup.position.y = 1.86;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 18, 18), skinMat);
       head.castShadow = true;
       headGroup.add(head);
 
@@ -911,10 +1243,7 @@
       if (facingZ < 0) rBlush.rotation.y = Math.PI;
       headGroup.add(lBlush, rBlush);
 
-      const hairCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.38, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.56),
-        hairMat
-      );
+      const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.56), hairMat);
       hairCap.position.y = 0.04;
       headGroup.add(hairCap);
 
@@ -924,7 +1253,7 @@
         pony.position.set(0, 0.02, -facingZ * 0.38);
         headGroup.add(pony);
 
-        const visorBand = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.04, 8, 20), whiteMat);
+        const visorBand = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.04, 8, 20), trimMat);
         visorBand.rotation.x = Math.PI / 2;
         visorBand.position.y = 0.14;
         headGroup.add(visorBand);
@@ -934,7 +1263,7 @@
         if (facingZ < 0) brim.rotation.y = Math.PI;
         headGroup.add(brim);
       } else {
-        const band = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.045, 8, 20), accentMat);
+        const band = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.045, 8, 20), trimMat);
         band.rotation.x = Math.PI / 2;
         band.position.y = 0.15;
         headGroup.add(band);
@@ -965,18 +1294,12 @@
       const racketPivot = new THREE.Group();
       racketPivot.position.set(0, -0.52, 0);
 
-      const handle = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.038, 0.042, 0.46, 8),
-        darkMat
-      );
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.042, 0.46, 8), darkMat);
       handle.rotation.x = facingZ * (Math.PI / 2.15);
       handle.position.set(0, 0, facingZ * 0.22);
       racketPivot.add(handle);
 
-      const rim = new THREE.Mesh(
-        new THREE.TorusGeometry(0.30, 0.036, 10, 22),
-        accentMat
-      );
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.30, 0.036, 10, 22), trimMat);
       rim.scale.set(0.88, 1.18, 1);
       rim.position.set(0, 0.1, facingZ * 0.72);
       racketPivot.add(rim);
@@ -992,15 +1315,8 @@
       rightArm.add(racketPivot);
       root.add(rightArm);
 
-      // Glowing 3D Swing Arc Trail for clear forehand/backhand/serve/smash feedback
       const trailGeo = new THREE.RingGeometry(0.55, 1.15, 20, 1, -0.4, Math.PI * 0.95);
-      const trailMat = new THREE.MeshBasicMaterial({
-        color: 0xfacc15,
-        transparent: true,
-        opacity: 0.0,
-        side: THREE.DoubleSide,
-        depthWrite: false
-      });
+      const trailMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false });
       const swingTrail = new THREE.Mesh(trailGeo, trailMat);
       swingTrail.position.set(0, 1.25, facingZ * 0.35);
       root.add(swingTrail);
@@ -1023,24 +1339,43 @@
 
       const userGender = state.gender;
       const partnerGender = userGender === 'male' ? 'female' : 'male';
+      const isWimbledon = state.courtKey === 'wimbledon';
+
+      // Wimbledon strict ALL-WHITE dress code; other slams wear formal coordinated tennis sets
+      const p1Shirt = isWimbledon ? 0xffffff : 0x0ea5e9;
+      const p1Bottom = isWimbledon ? 0xf8fafc : 0x0f172a;
+      const p1Trim = isWimbledon ? 0xffffff : 0xfacc15;
+
+      const p2Shirt = isWimbledon ? 0xffffff : 0x0284c7;
+      const p2Bottom = isWimbledon ? 0xf8fafc : 0xffffff;
+      const p2Trim = isWimbledon ? 0xf8fafc : 0x38bdf8;
+
+      const ai1Shirt = isWimbledon ? 0xffffff : 0xf43f5e;
+      const ai1Bottom = isWimbledon ? 0xf8fafc : 0x1e293b;
+      const ai1Trim = isWimbledon ? 0xffffff : 0xfde047;
+
+      const ai2Shirt = isWimbledon ? 0xffffff : 0xe11d48;
+      const ai2Bottom = isWimbledon ? 0xf8fafc : 0xffffff;
+      const ai2Trim = isWimbledon ? 0xf8fafc : 0xfb7185;
 
       const roster = state.mode === 'singles'
         ? [
-            { id: 'p1', team: 'p1', role: 'user', gender: userGender, shirt: 0x0ea5e9, accent: 0xfacc15, skin: 0xfcd5b5, hair: 0x1e293b, x: 0, z: 11.2, facing: -1 },
-            { id: 'ai1', team: 'ai', role: 'ai', gender: userGender === 'male' ? 'female' : 'male', shirt: 0xf43f5e, accent: 0xffffff, skin: 0xf5cba7, hair: 0x451a03, x: 0, z: -11.2, facing: 1 }
+            { id: 'p1', team: 'p1', role: 'user', gender: userGender, shirt: p1Shirt, bottom: p1Bottom, trim: p1Trim, skin: 0xfcd5b5, hair: 0x1e293b, x: 0, z: 11.2, facing: -1 },
+            { id: 'ai1', team: 'ai', role: 'ai', gender: userGender === 'male' ? 'female' : 'male', shirt: ai1Shirt, bottom: ai1Bottom, trim: ai1Trim, skin: 0xf5cba7, hair: 0x451a03, x: 0, z: -11.2, facing: 1 }
           ]
         : [
-            { id: 'p1', team: 'p1', role: 'user', gender: userGender, shirt: 0x0ea5e9, accent: 0xfacc15, skin: 0xfcd5b5, hair: 0x1e293b, x: -2.3, z: 11.2, facing: -1 },
-            { id: 'p2', team: 'p1', role: 'partner', gender: partnerGender, shirt: 0x0284c7, accent: 0xfde047, skin: 0xfde2c8, hair: 0x78350f, x: 2.3, z: 4.5, facing: -1 },
-            { id: 'ai1', team: 'ai', role: 'ai', gender: 'male', shirt: 0xf43f5e, accent: 0xffffff, skin: 0xf5cba7, hair: 0x1c1917, x: 2.3, z: -11.2, facing: 1 },
-            { id: 'ai2', team: 'ai', role: 'ai', gender: 'female', shirt: 0xe11d48, accent: 0xfef08a, skin: 0xfcd5b5, hair: 0x92400e, x: -2.3, z: -4.5, facing: 1 }
+            { id: 'p1', team: 'p1', role: 'user', gender: userGender, shirt: p1Shirt, bottom: p1Bottom, trim: p1Trim, skin: 0xfcd5b5, hair: 0x1e293b, x: -2.3, z: 11.2, facing: -1 },
+            { id: 'p2', team: 'p1', role: 'partner', gender: partnerGender, shirt: p2Shirt, bottom: p2Bottom, trim: p2Trim, skin: 0xfde2c8, hair: 0x78350f, x: 2.3, z: 4.5, facing: -1 },
+            { id: 'ai1', team: 'ai', role: 'ai', gender: 'male', shirt: ai1Shirt, bottom: ai1Bottom, trim: ai1Trim, skin: 0xf5cba7, hair: 0x1c1917, x: 2.3, z: -11.2, facing: 1 },
+            { id: 'ai2', team: 'ai', role: 'ai', gender: 'female', shirt: ai2Shirt, bottom: ai2Bottom, trim: ai2Trim, skin: 0xfcd5b5, hair: 0x92400e, x: -2.3, z: -4.5, facing: 1 }
           ];
 
       roster.forEach(r => {
         const rig = createCartoonPlayer({
           gender: r.gender,
           shirtColor: r.shirt,
-          accentColor: r.accent,
+          bottomColor: r.bottom,
+          trimColor: r.trim,
           skinColor: r.skin,
           hairColor: r.hair,
           facingZ: r.facing
@@ -1065,13 +1400,104 @@
     }
 
     // =========================================================================
-    // 5. INPUT HANDLING (KEYBOARD + MOUSE + MOBILE TOUCH JOYSTICK)
+    // 6. INPUT HANDLING: MAP ORBIT/RAYCAST + MATCH CONTROLS
     // =========================================================================
     const keys = {};
     const joyVec = { x: 0, y: 0 };
+    const raycaster = new THREE.Raycaster();
+    const pointerNDC = new THREE.Vector2();
+
+    function focusIsland(courtKey, openDetail = true) {
+      state.courtKey = courtKey;
+      const cfg = COURTS[courtKey];
+      mapOrbit.targetLookAt.copy(cfg.islandPos).add(new THREE.Vector3(0, 1.2, 0));
+      mapOrbit.targetRadius = window.innerWidth < 640 ? 12.5 : 10.5;
+      mapOrbit.targetPhi = 0.92;
+
+      document.querySelectorAll('.island-nav-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-island') === courtKey);
+      });
+
+      if (openDetail) {
+        document.getElementById('detail-badge').textContent = cfg.badge;
+        document.getElementById('detail-title').textContent = cfg.name;
+        document.getElementById('detail-landmarks').textContent = cfg.landmarks;
+        document.getElementById('detail-desc').textContent = cfg.desc;
+        document.getElementById('island-detail-panel').classList.remove('hidden');
+      }
+      playSound('select');
+    }
+
+    function resetMapOverview() {
+      mapOrbit.targetLookAt.set(0, 0.6, 0);
+      mapOrbit.targetRadius = window.innerWidth < 640 ? 31 : 25.5;
+      mapOrbit.targetPhi = 0.78;
+      document.querySelectorAll('.island-nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('island-detail-panel').classList.add('hidden');
+    }
+
+    (function initCanvasPointer() {
+      const canvas = document.getElementById('three-canvas');
+      let dragging = false;
+      let startX = 0, startY = 0;
+      let lastX = 0, lastY = 0;
+      let movedDist = 0;
+
+      canvas.addEventListener('pointerdown', e => {
+        ensureAudio();
+        if (state.viewMode === 'map') {
+          dragging = true;
+          startX = lastX = e.clientX;
+          startY = lastY = e.clientY;
+          movedDist = 0;
+        } else if (state.running && !state.paused) {
+          if (e.button === 2) triggerPlayerAction('lob');
+          else triggerPlayerAction('normal');
+        }
+      });
+
+      window.addEventListener('pointermove', e => {
+        if (!dragging || state.viewMode !== 'map') return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        movedDist += Math.hypot(dx, dy);
+        lastX = e.clientX;
+        lastY = e.clientY;
+
+        mapOrbit.targetTheta -= dx * 0.0075;
+        mapOrbit.targetPhi = Math.max(0.42, Math.min(1.22, mapOrbit.targetPhi - dy * 0.006));
+      });
+
+      window.addEventListener('pointerup', e => {
+        if (!dragging || state.viewMode !== 'map') {
+          dragging = false;
+          return;
+        }
+        dragging = false;
+        if (movedDist < 7) {
+          const rect = canvas.getBoundingClientRect();
+          pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(pointerNDC, mapCamera);
+          const hits = raycaster.intersectObjects(islandClickTargets, false);
+          if (hits.length > 0 && hits[0].object.userData.courtKey) {
+            focusIsland(hits[0].object.userData.courtKey, true);
+          }
+        }
+      });
+
+      canvas.addEventListener('wheel', e => {
+        if (state.viewMode !== 'map') return;
+        e.preventDefault();
+        mapOrbit.targetRadius = Math.max(8, Math.min(36, mapOrbit.targetRadius + e.deltaY * 0.015));
+      }, { passive: false });
+
+      canvas.addEventListener('contextmenu', e => e.preventDefault());
+    })();
 
     window.addEventListener('keydown', e => {
       keys[e.code] = true;
+      if (state.viewMode !== 'match') return;
       if (e.code === 'Space' || e.code === 'KeyJ') {
         e.preventDefault();
         triggerPlayerAction('normal');
@@ -1083,27 +1509,6 @@
       }
     });
     window.addEventListener('keyup', e => { keys[e.code] = false; });
-
-    document.getElementById('three-canvas').addEventListener('mousedown', e => {
-      if (!state.running || state.paused) return;
-      ensureAudio();
-      if (e.button === 2) triggerPlayerAction('lob');
-      else if (e.button === 0) triggerPlayerAction('normal');
-    });
-    document.getElementById('three-canvas').addEventListener('contextmenu', e => e.preventDefault());
-
-    // Prevent iOS Safari pinch-zoom and double-tap zoom from locking the viewport
-    ['gesturestart', 'gesturechange', 'gestureend'].forEach(evt => {
-      document.addEventListener(evt, e => e.preventDefault(), { passive: false });
-    });
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', e => {
-      const now = performance.now();
-      if (now - lastTouchEnd <= 320) {
-        e.preventDefault();
-      }
-      lastTouchEnd = now;
-    }, { passive: false });
 
     (function initJoystick() {
       const zone = document.getElementById('joystick-zone');
@@ -1168,7 +1573,7 @@
     })();
 
     // =========================================================================
-    // 6. TENNIS PHYSICS, SCORING & AI LOGIC
+    // 7. TENNIS PHYSICS, OFFICIAL RULES & SCORING
     // =========================================================================
     function getCourtHalfWidth() {
       return state.mode === 'doubles' ? DOUBLES_HALF_W : SINGLES_HALF_W;
@@ -1311,7 +1716,7 @@
     }
 
     function triggerPlayerAction(shotType) {
-      if (!state.running || state.paused || state.matchOver) return;
+      if (state.viewMode !== 'match' || !state.running || state.paused || state.matchOver) return;
       ensureAudio();
 
       const now = performance.now();
@@ -1349,7 +1754,7 @@
         const aim = getPlayerAimVec();
         const boxCenterX = (box.minX + box.maxX) / 2;
         const targetX = Math.max(box.minX + 0.35, Math.min(box.maxX - 0.35, boxCenterX + aim.x * 1.45));
-        const depthFactor = aim.z < -0.2 ? 0.86 : aim.z > 0.2 ? 0.56 : 0.72;
+        const depthFactor = aim.z < -0.2 ? 0.86 : 0.72;
         const targetZ = -SERVICE_LINE_Z * (shotType === 'lob' ? 0.82 : depthFactor);
         let flight = shotType === 'lob' ? 0.92 : 0.74;
         if (isDoubleTap) {
@@ -1387,10 +1792,10 @@
       if (keys['KeyA'] || keys['ArrowLeft']) bx -= 1;
       if (keys['KeyD'] || keys['ArrowRight']) bx += 1;
       if (keys['KeyW'] || keys['ArrowUp']) bz -= 1;
-      if (keys['KeyS'] || keys['ArrowDown']) bz += 1;
+      // S (Down) drop-shot removed per user request
       return {
         x: Math.max(-1, Math.min(1, bx)),
-        z: Math.max(-1, Math.min(1, bz))
+        z: Math.max(-1, Math.min(0, bz))
       };
     }
 
@@ -1426,20 +1831,11 @@
       if (Math.abs(aimX) < 0.12) {
         targetX = (Math.random() - 0.5) * hw * 1.4;
       }
-      if (team === 'ai') {
-        const dCfg = DIFFICULTY[state.difficulty];
-        targetX += (Math.random() - 0.5) * dCfg.aiError;
-        // Easy AI occasionally hits wide/long to feel naturally approachable
-        if (Math.random() < dCfg.aiMissRate) {
-          targetX = (Math.random() < 0.5 ? -1 : 1) * (hw + 1.15);
-        }
-      }
 
+      // W (Up) drives deep near baseline; S (Down) no longer shortens the shot
       let depthRatio = 0.72 + Math.random() * 0.16;
-      if (team === 'ai' && state.difficulty === 'easy') {
-        depthRatio = 0.45 + Math.random() * 0.22;
-      } else if (team === 'p1' && Math.abs(aimZ) > 0.2) {
-        depthRatio = aimZ < 0 ? 0.88 : 0.46;
+      if (team === 'p1' && aimZ < -0.2) {
+        depthRatio = 0.88;
       }
       const targetZ = dirZ * (COURT_HALF_LEN * (shotType === 'lob' ? 0.86 : depthRatio));
 
@@ -1509,12 +1905,10 @@
         if (state.p1Games >= state.targetGames || state.aiGames >= state.targetGames) {
           state.matchOver = true;
           const youWin = state.p1Games > state.aiGames;
-          if (youWin) playSound('match_win');
           showCallout(youWin ? '🏆 比賽勝利！' : '比賽結束', `${state.p1Games} : ${state.aiGames}`, 3000);
           setTimeout(() => showMatchEndModal(youWin), 1400);
           return;
         } else {
-          if (gameWonBy === 'p1') playSound('game_win');
           showCallout(gameWonBy === 'p1' ? 'GAME! 你拿下這局' : 'GAME! 對手拿下這局', `局數 ${state.p1Games} - ${state.aiGames}`);
         }
       } else {
@@ -1540,11 +1934,37 @@
     }
 
     // =========================================================================
-    // 7. MAIN UPDATE LOOP
+    // 8. MAIN UPDATE & RENDER LOOP
     // =========================================================================
     let lastTime = performance.now();
 
-    function update(dt) {
+    function updateMap(dt) {
+      const t = performance.now() * 0.001;
+      mapOrbit.theta += (mapOrbit.targetTheta - mapOrbit.theta) * 6 * dt;
+      mapOrbit.phi += (mapOrbit.targetPhi - mapOrbit.phi) * 6 * dt;
+      mapOrbit.radius += (mapOrbit.targetRadius - mapOrbit.radius) * 6 * dt;
+      mapOrbit.lookAt.lerp(mapOrbit.targetLookAt, 6 * dt);
+
+      const sinPhi = Math.sin(mapOrbit.phi);
+      mapCamera.position.set(
+        mapOrbit.lookAt.x + mapOrbit.radius * sinPhi * Math.sin(mapOrbit.theta),
+        mapOrbit.lookAt.y + mapOrbit.radius * Math.cos(mapOrbit.phi),
+        mapOrbit.lookAt.z + mapOrbit.radius * sinPhi * Math.cos(mapOrbit.theta)
+      );
+      mapCamera.lookAt(mapOrbit.lookAt);
+
+      // Gentle island bobbing & cloud drifting
+      islandGroups.forEach((item, idx) => {
+        item.grp.position.y = Math.sin(t * 1.4 + idx * 1.5) * 0.08;
+      });
+      mapClouds.forEach(c => {
+        c.angle += c.speed * dt;
+        c.mesh.position.x = Math.cos(c.angle) * c.radius;
+        c.mesh.position.z = Math.sin(c.angle) * c.radius;
+      });
+    }
+
+    function updateMatch(dt) {
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life -= dt;
@@ -1560,10 +1980,7 @@
       }
 
       if (!state.running || state.paused) return;
-
-      if (state.justHitTimer > 0) {
-        state.justHitTimer = Math.max(0, state.justHitTimer - dt);
-      }
+      if (state.justHitTimer > 0) state.justHitTimer = Math.max(0, state.justHitTimer - dt);
 
       if (state.phase === 'serve_wait' && state.server === 'ai') {
         state.phaseTimer -= dt;
@@ -1880,13 +2297,25 @@
       const now = performance.now();
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
-      update(dt);
-      renderer.render(scene, camera);
+
+      if (state.viewMode === 'map') {
+        updateMap(dt);
+        renderer.render(mapScene, mapCamera);
+      } else {
+        updateMatch(dt);
+        renderer.render(scene, camera);
+      }
     }
 
     // =========================================================================
-    // 8. UI EVENT WIRING & INITIALIZATION
+    // 9. UI EVENT WIRING & INITIALIZATION
     // =========================================================================
+    function syncControlHints() {
+      const inMatch = state.viewMode === 'match' && state.running;
+      document.getElementById('touch-controls').classList.toggle('hidden', !state.showTouch || !inMatch);
+      document.getElementById('desktop-hint').classList.toggle('hidden', state.showTouch || !inMatch);
+    }
+
     function wireUI() {
       function setupGroup(selector, stateKey, attr) {
         const btns = document.querySelectorAll(selector);
@@ -1901,22 +2330,32 @@
 
       setupGroup('.mode-btn', 'mode', 'data-mode');
       setupGroup('.gender-btn', 'gender', 'data-gender');
-      setupGroup('.court-card', 'courtKey', 'data-court');
       setupGroup('.diff-btn', 'difficulty', 'data-diff');
       setupGroup('.games-btn', 'targetGames', 'data-games');
+
+      // Sidebar island quick switch
+      document.querySelectorAll('.island-nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          ensureAudio();
+          focusIsland(btn.getAttribute('data-island'), true);
+        });
+      });
+
+      document.getElementById('btn-map-overview').addEventListener('click', () => {
+        ensureAudio();
+        resetMapOverview();
+      });
+
+      document.getElementById('btn-close-detail').addEventListener('click', () => {
+        resetMapOverview();
+      });
 
       const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       state.showTouch = isTouchDevice;
 
-      function syncControlHints() {
-        document.getElementById('touch-controls').classList.toggle('hidden', !state.showTouch || !state.running);
-        document.getElementById('desktop-hint').classList.toggle('hidden', state.showTouch || !state.running);
-      }
-
       document.getElementById('btn-start-match').addEventListener('click', () => {
         ensureAudio();
         startNewMatch();
-        syncControlHints();
       });
 
       document.getElementById('btn-toggle-touch').addEventListener('click', () => {
@@ -1935,28 +2374,29 @@
       document.getElementById('btn-restart-same').addEventListener('click', () => {
         document.getElementById('pause-modal').classList.add('hidden');
         startNewMatch();
-        syncControlHints();
       });
 
       document.getElementById('btn-back-setup').addEventListener('click', () => {
+        state.viewMode = 'map';
         state.running = false;
         state.paused = false;
         document.getElementById('pause-modal').classList.add('hidden');
         document.getElementById('hud-top').classList.add('hidden');
         document.getElementById('serve-hint').classList.add('hidden');
-        document.getElementById('setup-modal').classList.remove('hidden');
+        document.getElementById('callout-banner').classList.add('hidden');
+        document.getElementById('map-ui').classList.remove('hidden');
         syncControlHints();
       });
     }
 
     function togglePause() {
-      if (!state.running || state.matchOver) return;
+      if (state.viewMode !== 'match' || !state.running || state.matchOver) return;
       state.paused = !state.paused;
       const modal = document.getElementById('pause-modal');
       if (state.paused) {
         document.getElementById('pause-emoji').textContent = '⏸️';
         document.getElementById('pause-title').textContent = '比賽暫停';
-        document.getElementById('pause-subtitle').textContent = '隨時調整設定或繼續比賽';
+        document.getElementById('pause-subtitle').textContent = '隨時調整設定或返回群島地圖';
         document.getElementById('btn-resume').classList.remove('hidden');
         modal.classList.remove('hidden');
       } else {
@@ -1965,6 +2405,7 @@
     }
 
     function startNewMatch() {
+      state.viewMode = 'match';
       state.p1Games = 0;
       state.aiGames = 0;
       state.p1Points = 0;
@@ -1978,16 +2419,20 @@
       buildCharacters();
       updateScoreHUD();
 
-      document.getElementById('setup-modal').classList.add('hidden');
+      document.getElementById('map-ui').classList.add('hidden');
       document.getElementById('pause-modal').classList.add('hidden');
       document.getElementById('hud-top').classList.remove('hidden');
+      syncControlHints();
 
       setupNextPoint();
-      showCallout(COURTS[state.courtKey].name, state.mode === 'singles' ? '單打對決開始！' : '雙打對決開始！', 1600);
+      showCallout(COURTS[state.courtKey].name, state.mode === 'singles' ? '單打對決開始！' : '雙打對決開始！', 1400);
     }
 
     window.onload = function () {
-      initThree();
+      initRenderer();
+      initMapScene();
+      initMatchScene();
+      resetMapOverview();
       wireUI();
       animate();
     };
