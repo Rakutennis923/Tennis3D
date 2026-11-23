@@ -654,6 +654,8 @@
     const mapClouds = [];
     const miniRallies = [];
     const mapNightLights = []; // { light, bulbMats, baseIntensity }
+    const oceanStreaks = [];
+    const seaCreatures = []; // dolphins & whales
     const stadiumFloodLights = []; // { light, bulbMat }
     let matchStars = null;
 
@@ -1372,6 +1374,84 @@
       oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
       oceanMesh.receiveShadow = true;
       mapScene.add(oceanMesh);
+
+      // Flowing Ocean Current Foam Streaks
+      const streakMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.42 });
+      for (let i = 0; i < 36; i++) {
+        const len = 1.6 + Math.random() * 2.4;
+        const sm = new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, 0.14), streakMat.clone());
+        sm.position.set((Math.random() - 0.5) * 46, 0.03, (Math.random() - 0.5) * 40);
+        sm.rotation.y = 0.28 + (Math.random() - 0.5) * 0.15;
+        mapScene.add(sm);
+        oceanStreaks.push({
+          mesh: sm,
+          speed: 1.1 + Math.random() * 1.2,
+          baseOpacity: 0.25 + Math.random() * 0.28
+        });
+      }
+
+      // Cute 3D Toy Dolphins & Whales swimming & leaping during daytime
+      function createDolphin() {
+        const g = new THREE.Group();
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.35 });
+        const bellyMat = new THREE.MeshStandardMaterial({ color: 0xe0f2fe, roughness: 0.4 });
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), bodyMat);
+        body.scale.set(0.75, 0.8, 2.2);
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), bellyMat);
+        belly.scale.set(0.65, 0.55, 1.8);
+        belly.position.y = -0.1;
+        const snout = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 8), bodyMat);
+        snout.rotation.x = Math.PI / 2;
+        snout.position.set(0, -0.04, 0.78);
+        const fin = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 4), bodyMat);
+        fin.position.set(0, 0.32, -0.05);
+        fin.rotation.x = -0.35;
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.06, 0.26), bodyMat);
+        tail.position.set(0, 0, -0.75);
+        g.add(body, belly, snout, fin, tail);
+        return g;
+      }
+
+      function createWhale() {
+        const g = new THREE.Group();
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e40af, roughness: 0.45 });
+        const bellyMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.5 });
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.72, 14, 12), bodyMat);
+        body.scale.set(0.95, 0.85, 2.1);
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(0.62, 12, 10), bellyMat);
+        belly.scale.set(0.85, 0.5, 1.85);
+        belly.position.y = -0.22;
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.1, 0.45), bodyMat);
+        tail.position.set(0, 0.05, -1.45);
+        // Cute water spout spray
+        const spout = new THREE.Mesh(
+          new THREE.ConeGeometry(0.22, 0.75, 8),
+          new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.75 })
+        );
+        spout.rotation.x = Math.PI;
+        spout.position.set(0, 0.95, 0.45);
+        g.add(body, belly, tail, spout);
+        return { group: g, spout };
+      }
+
+      const creatureRoutes = [
+        { type: 'dolphin', cx: -3.6, cz: -2.6, rx: 2.2, rz: 1.5, speed: 0.72, phase: 0.2 },
+        { type: 'dolphin', cx: 3.8,  cz: 2.5,  rx: 2.0, rz: 1.7, speed: 0.65, phase: 2.4 },
+        { type: 'dolphin', cx: 0.0,  cz: -5.8, rx: 3.2, rz: 1.4, speed: 0.58, phase: 4.1 },
+        { type: 'whale',   cx: -3.5, cz: 2.6,  rx: 2.4, rz: 1.6, speed: 0.28, phase: 1.0 },
+        { type: 'whale',   cx: 4.2,  cz: -2.4, rx: 2.3, rz: 1.8, speed: 0.25, phase: 3.7 }
+      ];
+      creatureRoutes.forEach(r => {
+        if (r.type === 'dolphin') {
+          const mesh = createDolphin();
+          mapScene.add(mesh);
+          seaCreatures.push({ ...r, mesh, spout: null });
+        } else {
+          const { group, spout } = createWhale();
+          mapScene.add(group);
+          seaCreatures.push({ ...r, mesh: group, spout });
+        }
+      });
 
       // Decorative fluffy clouds
       const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
@@ -2569,6 +2649,53 @@
         mapOrbit.lookAt.z + mapOrbit.radius * sinPhi * Math.cos(mapOrbit.theta)
       );
       mapCamera.lookAt(mapOrbit.lookAt);
+
+      // Animated flowing ocean waves & current streaks
+      const posAttr = oceanMesh.geometry.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        const vx = posAttr.getX(i);
+        const vz = posAttr.getZ(i);
+        const wave = Math.sin(vx * 0.25 + t * 1.8) * 0.12 + Math.cos(vz * 0.22 + t * 1.4) * 0.1;
+        posAttr.setY(i, wave);
+      }
+      posAttr.needsUpdate = true;
+
+      const dayVisibility = Math.max(0, 1 - solar.nightFactor * 1.25);
+      oceanStreaks.forEach(s => {
+        s.mesh.position.x += s.speed * dt;
+        s.mesh.position.z += s.speed * 0.32 * dt;
+        if (s.mesh.position.x > 24) s.mesh.position.x = -24;
+        if (s.mesh.position.z > 20) s.mesh.position.z = -20;
+        s.mesh.material.opacity = s.baseOpacity * (0.35 + dayVisibility * 0.65);
+      });
+
+      // Dolphins leaping & Whales surfacing in daytime
+      seaCreatures.forEach(c => {
+        c.phase += c.speed * dt;
+        const nx = c.cx + Math.cos(c.phase) * c.rx;
+        const nz = c.cz + Math.sin(c.phase) * c.rz;
+        const dx = -Math.sin(c.phase) * c.rx;
+        const dz = Math.cos(c.phase) * c.rz;
+        c.mesh.visible = dayVisibility > 0.08;
+        if (!c.mesh.visible) return;
+
+        if (c.type === 'dolphin') {
+          const leap = Math.sin(c.phase * 3.0); // occasional leaps above water
+          const y = leap > 0.15 ? (leap - 0.15) * 1.25 : -0.35;
+          c.mesh.position.set(nx, y, nz);
+          c.mesh.rotation.y = Math.atan2(dx, dz);
+          c.mesh.rotation.x = -Math.cos(c.phase * 3.0) * 0.45;
+        } else {
+          const surface = Math.sin(c.phase * 1.8);
+          const y = surface > 0 ? surface * 0.45 - 0.1 : -0.85;
+          c.mesh.position.set(nx, y, nz);
+          c.mesh.rotation.y = Math.atan2(dx, dz);
+          if (c.spout) {
+            c.spout.visible = surface > 0.45;
+            c.spout.scale.y = 0.7 + Math.sin(t * 8) * 0.25;
+          }
+        }
+      });
 
       // Gentle island bobbing & cloud drifting
       islandGroups.forEach((item, idx) => {
