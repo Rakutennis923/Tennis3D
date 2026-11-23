@@ -127,41 +127,37 @@
           </div>
         </div>
 
-        <button id="btn-map-overview" class="warm-glass hover:bg-amber-100 rounded-xl px-3 py-2 text-xs sm:text-sm font-extrabold shadow-lg pointer-events-auto flex items-center gap-1.5">
-          <span>🗺️</span>
-          <span>群島全覽</span>
-        </button>
+        <div class="flex items-center gap-1.5 pointer-events-auto">
+          <button id="btn-zoom-in" title="放大" class="warm-glass hover:bg-amber-100 rounded-xl w-8 h-8 sm:w-9 sm:h-9 text-sm sm:text-base font-black shadow-lg flex items-center justify-center">+</button>
+          <button id="btn-zoom-out" title="縮小" class="warm-glass hover:bg-amber-100 rounded-xl w-8 h-8 sm:w-9 sm:h-9 text-sm sm:text-base font-black shadow-lg flex items-center justify-center">−</button>
+          <button id="btn-map-overview" class="warm-glass hover:bg-amber-100 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-extrabold shadow-lg flex items-center gap-1">
+            <span>🗺️</span>
+            <span class="hidden sm:inline">群島全覽</span>
+          </button>
+        </div>
       </div>
 
-      <!-- Left Quick-Switch Sidebar -->
-      <div id="map-sidebar" class="absolute left-3 sm:left-5 top-20 sm:top-24 flex flex-col gap-1.5 sm:gap-2 pointer-events-auto">
-        <button type="button" data-island="usopen" class="island-nav-btn warm-glass rounded-xl px-2.5 py-2 sm:px-3.5 sm:py-2.5 text-left shadow-lg flex items-center gap-2 text-xs sm:text-sm font-bold">
-          <span class="text-base sm:text-lg">🗽</span>
-          <div>
-            <div class="leading-tight">美國・美網</div>
-            <div class="text-[10px] opacity-75 hidden sm:block">硬地 • 自由女神</div>
-          </div>
+      <!-- Floating Badges Positioned Directly Above Each 3D Island -->
+      <div id="floating-island-labels" class="absolute inset-0 pointer-events-none overflow-hidden">
+        <button type="button" data-island="usopen" class="island-nav-btn warm-glass pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 shadow-lg flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-extrabold whitespace-nowrap">
+          <span>🗽</span>
+          <span>美國・美網</span>
+          <span class="opacity-70 font-semibold hidden sm:inline">硬地</span>
         </button>
-        <button type="button" data-island="frenchopen" class="island-nav-btn warm-glass rounded-xl px-2.5 py-2 sm:px-3.5 sm:py-2.5 text-left shadow-lg flex items-center gap-2 text-xs sm:text-sm font-bold">
-          <span class="text-base sm:text-lg">🗼</span>
-          <div>
-            <div class="leading-tight">法國・法網</div>
-            <div class="text-[10px] opacity-75 hidden sm:block">紅土 • 艾菲爾鐵塔</div>
-          </div>
+        <button type="button" data-island="frenchopen" class="island-nav-btn warm-glass pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 shadow-lg flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-extrabold whitespace-nowrap">
+          <span>🗼</span>
+          <span>法國・法網</span>
+          <span class="opacity-70 font-semibold hidden sm:inline">紅土</span>
         </button>
-        <button type="button" data-island="wimbledon" class="island-nav-btn warm-glass rounded-xl px-2.5 py-2 sm:px-3.5 sm:py-2.5 text-left shadow-lg flex items-center gap-2 text-xs sm:text-sm font-bold">
-          <span class="text-base sm:text-lg">🏰</span>
-          <div>
-            <div class="leading-tight">英國・溫網</div>
-            <div class="text-[10px] opacity-75 hidden sm:block">草地 • 全白服裝規定</div>
-          </div>
+        <button type="button" data-island="wimbledon" class="island-nav-btn warm-glass pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 shadow-lg flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-extrabold whitespace-nowrap">
+          <span>🏰</span>
+          <span>英國・溫網</span>
+          <span class="opacity-70 font-semibold hidden sm:inline">草地</span>
         </button>
-        <button type="button" data-island="ausopen" class="island-nav-btn warm-glass rounded-xl px-2.5 py-2 sm:px-3.5 sm:py-2.5 text-left shadow-lg flex items-center gap-2 text-xs sm:text-sm font-bold">
-          <span class="text-base sm:text-lg">🦘</span>
-          <div>
-            <div class="leading-tight">澳洲・澳網</div>
-            <div class="text-[10px] opacity-75 hidden sm:block">晴空硬地 • 歌劇院</div>
-          </div>
+        <button type="button" data-island="ausopen" class="island-nav-btn warm-glass pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 shadow-lg flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-extrabold whitespace-nowrap">
+          <span>🦘</span>
+          <span>澳洲・澳網</span>
+          <span class="opacity-70 font-semibold hidden sm:inline">硬地</span>
         </button>
       </div>
 
@@ -556,6 +552,7 @@
     const islandGroups = [];
     const islandClickTargets = [];
     const mapClouds = [];
+    const miniRallies = [];
 
     const mapOrbit = {
       theta: 0.35,
@@ -651,6 +648,39 @@
       );
       padNet.position.y = 0.08;
       padGroup.add(padOuter, padInner, padNet);
+
+      // Animated Miniature Players + Ball rallying on each island court
+      const isWim = cfg.surface === 'grass' && cfg.innerColor === '#1f7a3f';
+      const p1Col = isWim ? 0xffffff : 0x0ea5e9;
+      const p2Col = isWim ? 0xf8fafc : 0xf43f5e;
+      function makeMiniPlayer(color, zPos) {
+        const mp = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.18, 8), new THREE.MeshStandardMaterial({ color }));
+        body.position.y = 0.12;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), new THREE.MeshStandardMaterial({ color: 0xfcd5b5 }));
+        head.position.y = 0.25;
+        const racket = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.12, 0.02), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+        racket.position.set(0.09, 0.18, zPos > 0 ? -0.05 : 0.05);
+        mp.add(body, head, racket);
+        mp.position.set(0, 0.03, zPos);
+        return mp;
+      }
+      const miniP1 = makeMiniPlayer(p1Col, 0.78);
+      const miniP2 = makeMiniPlayer(p2Col, -0.78);
+      const miniBall = new THREE.Mesh(
+        new THREE.SphereGeometry(0.045, 8, 8),
+        new THREE.MeshStandardMaterial({ color: 0xd9f99d, emissive: 0x84cc16, emissiveIntensity: 0.45 })
+      );
+      miniBall.position.set(0, 0.2, 0);
+      padGroup.add(miniP1, miniP2, miniBall);
+      miniRallies.push({
+        p1: miniP1,
+        p2: miniP2,
+        ball: miniBall,
+        phase: Math.random() * Math.PI * 2,
+        speed: 1.85 + Math.random() * 0.45
+      });
+
       grp.add(padGroup);
 
       // Invisible generous hitbox for smooth clicking
@@ -1442,6 +1472,33 @@
       let startX = 0, startY = 0;
       let lastX = 0, lastY = 0;
       let movedDist = 0;
+      let lastPinchDist = null;
+
+      canvas.addEventListener('touchstart', e => {
+        if (state.viewMode === 'map' && e.touches.length === 2) {
+          dragging = false;
+          lastPinchDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('touchmove', e => {
+        if (state.viewMode === 'map' && e.touches.length === 2 && lastPinchDist !== null) {
+          const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          const delta = lastPinchDist - dist;
+          mapOrbit.targetRadius = Math.max(8, Math.min(36, mapOrbit.targetRadius + delta * 0.055));
+          lastPinchDist = dist;
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('touchend', e => {
+        if (e.touches.length < 2) lastPinchDist = null;
+      });
 
       canvas.addEventListener('pointerdown', e => {
         ensureAudio();
@@ -1962,6 +2019,41 @@
         c.mesh.position.x = Math.cos(c.angle) * c.radius;
         c.mesh.position.z = Math.sin(c.angle) * c.radius;
       });
+
+      // Animate miniature players & rallying ball on each island's court
+      miniRallies.forEach(r => {
+        r.phase += dt * r.speed;
+        const s = Math.sin(r.phase); // -1 to 1 across Z
+        const z = s * 0.75;
+        const arc = Math.abs(Math.cos(r.phase)) * 0.28 + 0.09;
+        const x = Math.sin(r.phase * 0.5) * 0.36;
+        r.ball.position.set(x, arc, z);
+        r.p1.position.x += (x * 0.85 - r.p1.position.x) * 6 * dt;
+        r.p2.position.x += (x * 0.85 - r.p2.position.x) * 6 * dt;
+        // Swing bob when ball is near player
+        r.p1.rotation.z = s > 0.7 ? Math.sin(r.phase * 6) * 0.25 : 0;
+        r.p2.rotation.z = s < -0.7 ? Math.sin(r.phase * 6) * 0.25 : 0;
+      });
+
+      // Project floating badges directly above each 3D island
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const proj = new THREE.Vector3();
+      islandGroups.forEach(item => {
+        const btn = document.querySelector(`.island-nav-btn[data-island="${item.key}"]`);
+        if (!btn) return;
+        proj.set(item.grp.position.x, item.grp.position.y + 4.35, item.grp.position.z);
+        proj.project(mapCamera);
+        if (proj.z > 1) {
+          btn.style.display = 'none';
+        } else {
+          btn.style.display = 'flex';
+          const sx = (proj.x * 0.5 + 0.5) * w;
+          const sy = (-proj.y * 0.5 + 0.5) * h;
+          btn.style.left = `${sx}px`;
+          btn.style.top = `${sy}px`;
+        }
+      });
     }
 
     function updateMatch(dt) {
@@ -2341,6 +2433,14 @@
         });
       });
 
+      document.getElementById('btn-zoom-in').addEventListener('click', () => {
+        ensureAudio();
+        mapOrbit.targetRadius = Math.max(8, mapOrbit.targetRadius - 3.5);
+      });
+      document.getElementById('btn-zoom-out').addEventListener('click', () => {
+        ensureAudio();
+        mapOrbit.targetRadius = Math.min(36, mapOrbit.targetRadius + 3.5);
+      });
       document.getElementById('btn-map-overview').addEventListener('click', () => {
         ensureAudio();
         resetMapOverview();
