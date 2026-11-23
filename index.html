@@ -125,6 +125,10 @@
         </div>
 
         <div class="flex items-center gap-1.5 pointer-events-auto">
+          <button id="btn-time-cycle" title="切換日夜時段 (預設跟隨真實時間)" class="warm-glass hover:bg-amber-100 rounded-xl px-2 py-1.5 sm:px-2.5 sm:py-2 text-[11px] sm:text-xs font-extrabold shadow-lg flex items-center gap-1">
+            <span id="time-mode-icon">🕒</span>
+            <span id="time-mode-label">自動</span>
+          </button>
           <button id="btn-zoom-in" title="放大" class="warm-glass hover:bg-amber-100 rounded-xl w-8 h-8 sm:w-9 sm:h-9 text-sm sm:text-base font-black shadow-lg flex items-center justify-center">+</button>
           <button id="btn-zoom-out" title="縮小" class="warm-glass hover:bg-amber-100 rounded-xl w-8 h-8 sm:w-9 sm:h-9 text-sm sm:text-base font-black shadow-lg flex items-center justify-center">−</button>
           <button id="btn-map-overview" class="warm-glass hover:bg-amber-100 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-extrabold shadow-lg flex items-center gap-1">
@@ -265,6 +269,9 @@
         <button id="btn-toggle-touch" title="切換觸控按鍵" class="glass-panel hover:bg-white/15 text-white rounded-xl px-2.5 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-lg">
           <span>🎮</span>
           <span class="hidden sm:inline">觸控</span>
+        </button>
+        <button id="btn-match-time" title="切換日夜時段" class="glass-panel hover:bg-white/15 text-white rounded-xl px-2.5 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1 shadow-lg">
+          <span id="match-time-icon">🕒</span>
         </button>
         <button id="btn-mute" title="音效開關" class="glass-panel hover:bg-white/15 text-white rounded-xl px-2.5 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1 shadow-lg">
           <span id="mute-icon">🔊</span>
@@ -493,7 +500,8 @@
       phaseTimer: 0,
       lastHitTapTime: 0,
       justHitTimer: 0,
-      justHitBoosted: false
+      justHitBoosted: false,
+      timeMode: 'auto' // 'auto' | 'day' | 'dusk' | 'night'
     };
 
     // =========================================================================
@@ -640,11 +648,14 @@
     // 3. SHARED RENDERER + TWO SCENES (3D ARCHIPELAGO MAP + 3D TENNIS MATCH)
     // =========================================================================
     let renderer;
-    let mapScene, mapCamera, oceanMesh;
+    let mapScene, mapCamera, oceanMesh, mapHemiLight, mapSunLight, mapStars;
     const islandGroups = [];
     const islandClickTargets = [];
     const mapClouds = [];
     const miniRallies = [];
+    const mapNightLights = []; // { light, bulbMats, baseIntensity }
+    const stadiumFloodLights = []; // { light, bulbMat }
+    let matchStars = null;
 
     const mapOrbit = {
       theta: 0.35,
@@ -1217,6 +1228,113 @@
       parent.add(boba);
     }
 
+    function getSolarState() {
+      let h;
+      if (state.timeMode === 'day') h = 12.5;
+      else if (state.timeMode === 'dusk') h = 17.75;
+      else if (state.timeMode === 'night') h = 21.0;
+      else {
+        const now = new Date();
+        h = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+      }
+
+      // Compute smooth nightFactor (0 = full day, 1 = full night) and duskFactor (0..1 peak at sunset/sunrise)
+      let nightFactor = 0;
+      let duskFactor = 0;
+      if (h >= 16.5 && h < 19.0) {
+        const t = (h - 16.5) / 2.5; // 16:30 -> 19:00
+        nightFactor = t * t * (3 - 2 * t);
+        duskFactor = Math.sin(t * Math.PI);
+      } else if (h >= 19.0 || h < 5.5) {
+        nightFactor = 1;
+      } else if (h >= 5.5 && h < 7.5) {
+        const t = 1 - (h - 5.5) / 2.0; // 05:30 -> 07:30
+        nightFactor = t * t * (3 - 2 * t);
+        duskFactor = Math.sin(t * Math.PI) * 0.7;
+      }
+
+      // Sun arc across sky
+      const sunAngle = ((h - 6) / 12) * Math.PI;
+      const sunElevation = Math.sin(sunAngle);
+      const sunY = Math.max(4.5, sunElevation * 26);
+      const sunX = -Math.cos(sunAngle) * 24;
+      const sunZ = 14 - duskFactor * 8;
+
+      // Sky & Light colors
+      const daySky = new THREE.Color(0xbae6fd);
+      const duskSky = new THREE.Color(0xfb923c);
+      const nightSky = new THREE.Color(0x0b132b);
+      const skyColor = daySky.clone().lerp(nightSky, nightFactor).lerp(duskSky, duskFactor * 0.78);
+
+      const dayFog = new THREE.Color(0xe0f2fe);
+      const duskFog = new THREE.Color(0xfdba74);
+      const nightFog = new THREE.Color(0x0f172a);
+      const fogColor = dayFog.clone().lerp(nightFog, nightFactor).lerp(duskFog, duskFactor * 0.72);
+
+      const dayOcean = new THREE.Color(0x38bdf8);
+      const duskOcean = new THREE.Color(0x0369a1);
+      const nightOcean = new THREE.Color(0x0f172a);
+      const oceanColor = dayOcean.clone().lerp(nightOcean, nightFactor).lerp(duskOcean, duskFactor * 0.55);
+
+      const daySun = new THREE.Color(0xfffbeb);
+      const duskSun = new THREE.Color(0xff9e44);
+      const moonCol = new THREE.Color(0x93c5fd);
+      const sunColor = daySun.clone().lerp(moonCol, nightFactor).lerp(duskSun, duskFactor * 0.85);
+
+      return {
+        hour: h,
+        nightFactor,
+        duskFactor,
+        sunPos: new THREE.Vector3(sunX, sunY, sunZ),
+        skyColor,
+        fogColor,
+        oceanColor,
+        sunColor,
+        sunIntensity: 0.98 - nightFactor * 0.68 + duskFactor * 0.12,
+        hemiIntensity: 0.86 - nightFactor * 0.56
+      };
+    }
+
+    function createStarfield(radius = 65) {
+      const geo = new THREE.BufferGeometry();
+      const verts = [];
+      for (let i = 0; i < 240; i++) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI * 0.42;
+        verts.push(
+          radius * Math.sin(phi) * Math.cos(theta),
+          radius * Math.cos(phi) + 4,
+          radius * Math.sin(phi) * Math.sin(theta)
+        );
+      }
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+      const mat = new THREE.PointsMaterial({ color: 0xfef9c3, size: 0.45, transparent: true, opacity: 0 });
+      return new THREE.Points(geo, mat);
+    }
+
+    function addIslandStreetLamps(grp, positions) {
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+      const bulbMats = [];
+      positions.forEach(([lx, ly, lz]) => {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.72, 6), poleMat);
+        pole.position.set(lx, ly + 0.36, lz);
+        const bulbMat = new THREE.MeshStandardMaterial({
+          color: 0xfef08a,
+          emissive: 0xfbbf24,
+          emissiveIntensity: 0.05,
+          roughness: 0.25
+        });
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), bulbMat);
+        bulb.position.set(lx, ly + 0.75, lz);
+        grp.add(pole, bulb);
+        bulbMats.push(bulbMat);
+      });
+      const ptLight = new THREE.PointLight(0xffedd5, 0, 12, 1.8);
+      ptLight.position.set(0, 3.2, 0);
+      grp.add(ptLight);
+      mapNightLights.push({ light: ptLight, bulbMats, baseIntensity: 1.55 });
+    }
+
     function initMapScene() {
       mapScene = new THREE.Scene();
       mapScene.background = new THREE.Color(0xbae6fd);
@@ -1224,20 +1342,23 @@
 
       mapCamera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.1, 140);
 
-      const hemi = new THREE.HemisphereLight(0xfffbeb, 0x38bdf8, 0.85);
-      mapScene.add(hemi);
+      mapHemiLight = new THREE.HemisphereLight(0xfffbeb, 0x38bdf8, 0.85);
+      mapScene.add(mapHemiLight);
 
-      const sun = new THREE.DirectionalLight(0xfff7ed, 0.95);
-      sun.position.set(16, 26, 14);
-      sun.castShadow = true;
-      sun.shadow.mapSize.width = 1024;
-      sun.shadow.mapSize.height = 1024;
+      mapSunLight = new THREE.DirectionalLight(0xfff7ed, 0.95);
+      mapSunLight.position.set(16, 26, 14);
+      mapSunLight.castShadow = true;
+      mapSunLight.shadow.mapSize.width = 1024;
+      mapSunLight.shadow.mapSize.height = 1024;
       const d = 22;
-      sun.shadow.camera.left = -d;
-      sun.shadow.camera.right = d;
-      sun.shadow.camera.top = d;
-      sun.shadow.camera.bottom = -d;
-      mapScene.add(sun);
+      mapSunLight.shadow.camera.left = -d;
+      mapSunLight.shadow.camera.right = d;
+      mapSunLight.shadow.camera.top = d;
+      mapSunLight.shadow.camera.bottom = -d;
+      mapScene.add(mapSunLight);
+
+      mapStars = createStarfield(68);
+      mapScene.add(mapStars);
 
       // Warm toy ocean
       const oceanGeo = new THREE.PlaneGeometry(140, 140, 24, 24);
@@ -1282,6 +1403,10 @@
         grp.position.copy(cfg.islandPos);
         hitbox.userData.courtKey = key;
         builders[key](grp);
+        const lampPos = cfg.isTaiwanShape
+          ? [[-0.95, 0.98, 1.5], [0.95, 0.98, 0.2], [0.1, 0.98, -2.5]]
+          : [[-2.1, 0.88, 1.6], [2.2, 0.88, 0.2], [0.2, 0.88, -2.2]];
+        addIslandStreetLamps(grp, lampPos);
         mapScene.add(grp);
         islandGroups.push({ key, grp });
         islandClickTargets.push(hitbox);
@@ -1316,6 +1441,9 @@
       dirLight.shadow.camera.top = d;
       dirLight.shadow.camera.bottom = -d;
       scene.add(dirLight);
+
+      matchStars = createStarfield(72);
+      scene.add(matchStars);
 
       ballMesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.18, 16, 16),
@@ -1377,6 +1505,7 @@
 
     function buildCourt(courtKey) {
       if (courtGroup) scene.remove(courtGroup);
+      stadiumFloodLights.length = 0;
       courtGroup = new THREE.Group();
       const cfg = COURTS[courtKey];
 
@@ -1561,6 +1690,36 @@
       addSideStand(-1);
       addSideStand(1);
       addBackStand();
+
+      // 4 Tall Stadium Floodlight Towers (gradually switch on from dusk into night)
+      const towerMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.45, metalness: 0.4 });
+      [[-12.2, -18.2], [12.2, -18.2], [-12.2, 18.2], [12.2, 18.2]].forEach(([tx, tz]) => {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 11.5, 8), towerMat);
+        pole.position.set(tx, 5.75, tz);
+        pole.castShadow = true;
+        courtGroup.add(pole);
+
+        const headBox = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.9, 0.45), towerMat);
+        headBox.position.set(tx, 11.4, tz);
+        headBox.lookAt(0, 0, 0);
+        courtGroup.add(headBox);
+
+        const bulbMat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: 0xfffbeb,
+          emissiveIntensity: 0.05
+        });
+        const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.72), bulbMat);
+        panel.position.set(tx, 11.4, tz);
+        panel.lookAt(0, 0, 0);
+        panel.translateZ(0.24);
+        courtGroup.add(panel);
+
+        const pt = new THREE.PointLight(0xfff7ed, 0, 46, 1.4);
+        pt.position.set(tx * 0.85, 10.8, tz * 0.85);
+        courtGroup.add(pt);
+        stadiumFloodLights.push({ light: pt, bulbMat });
+      });
 
       scene.add(courtGroup);
     }
@@ -2385,6 +2544,19 @@
 
     function updateMap(dt) {
       const t = performance.now() * 0.001;
+      const solar = getSolarState();
+      mapScene.background.copy(solar.skyColor);
+      mapScene.fog.color.copy(solar.fogColor);
+      oceanMesh.material.color.copy(solar.oceanColor);
+      mapSunLight.position.copy(solar.sunPos);
+      mapSunLight.color.copy(solar.sunColor);
+      mapSunLight.intensity = solar.sunIntensity;
+      mapHemiLight.intensity = solar.hemiIntensity;
+      if (mapStars) mapStars.material.opacity = solar.nightFactor * 0.92;
+      mapNightLights.forEach(item => {
+        item.light.intensity = item.baseIntensity * solar.nightFactor;
+        item.bulbMats.forEach(m => { m.emissiveIntensity = 0.08 + solar.nightFactor * 2.2; });
+      });
       mapOrbit.theta += (mapOrbit.targetTheta - mapOrbit.theta) * 6 * dt;
       mapOrbit.phi += (mapOrbit.targetPhi - mapOrbit.phi) * 6 * dt;
       mapOrbit.radius += (mapOrbit.targetRadius - mapOrbit.radius) * 6 * dt;
@@ -2445,6 +2617,25 @@
     }
 
     function updateMatch(dt) {
+      const solar = getSolarState();
+      const cfg = COURTS[state.courtKey];
+      const baseDaySky = new THREE.Color(cfg.skyColor === 0x0f172a ? 0x38bdf8 : cfg.skyColor);
+      const duskSky = new THREE.Color(0xf97316);
+      const nightSky = new THREE.Color(0x090f24);
+      const activeSky = baseDaySky.clone().lerp(nightSky, solar.nightFactor).lerp(duskSky, solar.duskFactor * 0.65);
+      scene.background.copy(activeSky);
+      scene.fog.color.copy(activeSky);
+
+      dirLight.position.copy(solar.sunPos);
+      dirLight.color.copy(solar.sunColor);
+      dirLight.intensity = solar.sunIntensity;
+      ambientLight.intensity = Math.max(0.32, cfg.ambientIntensity * (1 - solar.nightFactor * 0.58));
+      if (matchStars) matchStars.material.opacity = solar.nightFactor * 0.9;
+      stadiumFloodLights.forEach(fl => {
+        fl.light.intensity = solar.nightFactor * 1.15;
+        fl.bulbMat.emissiveIntensity = 0.08 + solar.nightFactor * 2.4;
+      });
+
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life -= dt;
@@ -2849,6 +3040,30 @@
       document.getElementById('btn-toggle-touch').addEventListener('click', () => {
         state.showTouch = !state.showTouch;
         syncControlHints();
+      });
+
+      function cycleTimeMode() {
+        const order = ['auto', 'day', 'dusk', 'night'];
+        const nextIdx = (order.indexOf(state.timeMode) + 1) % order.length;
+        state.timeMode = order[nextIdx];
+        const meta = {
+          auto:  { icon: '🕒', label: '自動' },
+          day:   { icon: '☀️', label: '白天' },
+          dusk:  { icon: '🌇', label: '黃昏' },
+          night: { icon: '🌙', label: '夜晚' }
+        }[state.timeMode];
+        document.getElementById('time-mode-icon').textContent = meta.icon;
+        document.getElementById('time-mode-label').textContent = meta.label;
+        document.getElementById('match-time-icon').textContent = meta.icon;
+      }
+
+      document.getElementById('btn-time-cycle').addEventListener('click', () => {
+        ensureAudio();
+        cycleTimeMode();
+      });
+      document.getElementById('btn-match-time').addEventListener('click', () => {
+        ensureAudio();
+        cycleTimeMode();
       });
 
       document.getElementById('btn-mute').addEventListener('click', () => {
